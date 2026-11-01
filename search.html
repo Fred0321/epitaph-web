@@ -15,19 +15,20 @@
       </header>
 
       <form id="search-form" class="search-form" role="search">
-        <div class="search-row">
-          <label class="sr-only" for="q">按姓名或生卒年搜索</label>
-          <input type="search" id="q" placeholder="输入姓名或生卒年" autocomplete="off" enterkeyhint="search" />
-          <button type="submit" class="btn btn-primary search-submit">搜索</button>
+        <div class="field">
+          <label class="field-label" for="q-name">姓名</label>
+          <input type="text" id="q-name" placeholder="如：王德福" autocomplete="name" enterkeyhint="next" maxlength="20" />
         </div>
-        <div class="chip-row" role="group" aria-label="搜索范围">
-          <button type="button" class="chip" id="chip-name" aria-pressed="false">姓名</button>
-          <button type="button" class="chip" id="chip-year" aria-pressed="false">生卒年</button>
+        <div class="field">
+          <label class="field-label" for="q-year">年份</label>
+          <input type="text" id="q-year" inputmode="numeric" pattern="[0-9]*" placeholder="生年或卒年都可以，如 1958" autocomplete="off" enterkeyhint="search" maxlength="4" />
         </div>
+        <p class="search-need" id="need-hint" hidden>请至少填写姓名或年份。</p>
+        <button type="submit" class="btn btn-primary">搜索</button>
       </form>
 
       <div id="results"></div>
-      <p class="empty-hint" id="empty" hidden>没有找到相符的碑。请换个姓名或生卒年试试。</p>
+      <p class="empty-hint" id="empty" hidden>没有找到相符的碑。请换个姓名或年份试试。</p>
       <p class="search-scope-note">目前只能搜到本机保存并公开的碑和示例，接入云端后可搜全站</p>
     </section>
 
@@ -41,33 +42,27 @@
   <script>
     (function () {
       var form = document.getElementById("search-form");
-      var input = document.getElementById("q");
+      var nameEl = document.getElementById("q-name");
+      var yearEl = document.getElementById("q-year");
       var resultsEl = document.getElementById("results");
       var emptyEl = document.getElementById("empty");
-      var chipName = document.getElementById("chip-name");
-      var chipYear = document.getElementById("chip-year");
-      var mode = "all";
+      var needEl = document.getElementById("need-hint");
+      var searched = false;
 
       document.getElementById("search-pine").innerHTML = EpitaphApp.PINE_SVG;
       EpitaphApp.mountTabbar("search", false);
 
-      function setMode(next) {
-        mode = next;
-        chipName.setAttribute("aria-pressed", next === "name" ? "true" : "false");
-        chipYear.setAttribute("aria-pressed", next === "year" ? "true" : "false");
-        renderResults();
-      }
-
-      chipName.onclick = function () {
-        setMode(mode === "name" ? "all" : "name");
-      };
-      chipYear.onclick = function () {
-        setMode(mode === "year" ? "all" : "year");
-      };
-
       function renderResults() {
-        var cards = EpitaphData.search({ query: input.value, mode: mode });
+        var name = nameEl.value.trim();
+        var year = yearEl.value.trim();
         resultsEl.innerHTML = "";
+        if (!name && !year) {
+          needEl.hidden = false;
+          emptyEl.hidden = true;
+          return;
+        }
+        needEl.hidden = true;
+        var cards = EpitaphData.search({ name: name, year: year });
         emptyEl.hidden = cards.length > 0;
         cards.forEach(function (card) {
           var article = document.createElement("article");
@@ -174,16 +169,19 @@
         var searching = !id;
         document.getElementById("search-view").hidden = !searching;
         document.getElementById("detail-view").hidden = searching;
-        if (searching) renderResults();
-        else renderDetail(id);
+        if (searching) {
+          if (searched) renderResults();
+        } else {
+          renderDetail(id);
+        }
       }
 
       form.addEventListener("submit", function (event) {
         event.preventDefault();
+        searched = true;
         if (location.hash) location.hash = "";
         renderResults();
       });
-      input.addEventListener("input", renderResults);
 
       document.getElementById("btn-back").onclick = function () {
         location.hash = "";

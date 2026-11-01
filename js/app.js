@@ -367,15 +367,13 @@
     return name.indexOf(String(query || "").trim().toLowerCase()) !== -1;
   }
 
-  function yearHit(rec, query) {
-    var digits = String(query || "").replace(/\D/g, "");
-    if (!digits) return false;
-    var years = [];
-    if (rec.birthYear) years.push(String(rec.birthYear));
-    if (rec.deathYear) years.push(String(rec.deathYear));
-    return years.some(function (year) {
-      return digits.indexOf(year) !== -1 || year.indexOf(digits) !== -1;
-    });
+  function exactYearHit(rec, yearText) {
+    var text = String(yearText || "").trim();
+    if (!/^\d+$/.test(text)) return false;
+    var year = Number(text);
+    var birth = rec.birthYear ? Number(rec.birthYear) : NaN;
+    var death = rec.deathYear ? Number(rec.deathYear) : NaN;
+    return birth === year || death === year;
   }
 
   function toCard(rec) {
@@ -389,19 +387,20 @@
 
   /**
    * 搜索与读取的唯一入口。返回的卡片只有姓名、年份、墓志铭一行。
-   * 不按籍贯过滤，也不把籍贯放进卡片。
+   * 姓名为包含匹配，年份须与生年或卒年完全相同。两个都填则同时满足。
+   * 不按籍贯过滤，也不把籍贯放进卡片。未公开的碑不会离开这一层。
    */
   var EpitaphData = {
     formatYears: formatYears,
     search: function (criteria) {
       var opts = criteria || {};
-      var query = String(opts.query || "").trim();
-      var mode = opts.mode === "name" || opts.mode === "year" ? opts.mode : "all";
+      var name = String(opts.name || "").trim();
+      var year = String(opts.year == null ? "" : opts.year).trim();
+      if (!name && !year) return [];
       return collectPublic().filter(function (rec) {
-        if (!query) return true;
-        if (mode === "name") return nameHit(rec, query);
-        if (mode === "year") return yearHit(rec, query);
-        return nameHit(rec, query) || yearHit(rec, query);
+        if (name && !nameHit(rec, name)) return false;
+        if (year && !exactYearHit(rec, year)) return false;
+        return true;
       }).map(toCard);
     },
     getPublic: function (id) {
