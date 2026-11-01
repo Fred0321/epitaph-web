@@ -29,7 +29,8 @@
 
       <div id="results"></div>
       <p class="empty-hint" id="empty" hidden>没有找到相符的碑。请换个姓名或年份试试。</p>
-      <p class="search-scope-note">目前只能搜到本机保存并公开的碑和示例，接入云端后可搜全站</p>
+      <p class="cloud-note" id="cloud-note" hidden></p>
+      <p class="search-scope-note">可搜到示例，以及已付费并公开的碑。未付费的只留在本机。</p>
     </section>
 
     <section id="detail-view" hidden>
@@ -38,6 +39,8 @@
     </section>
   </div>
 
+  <script src="js/config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js"></script>
   <script src="js/app.js"></script>
   <script>
     (function () {
@@ -47,7 +50,9 @@
       var resultsEl = document.getElementById("results");
       var emptyEl = document.getElementById("empty");
       var needEl = document.getElementById("need-hint");
+      var cloudEl = document.getElementById("cloud-note");
       var searched = false;
+      var searchSeq = 0;
 
       document.getElementById("search-pine").innerHTML = EpitaphApp.PINE_SVG;
       EpitaphApp.mountTabbar("search", false);
@@ -62,9 +67,19 @@
           return;
         }
         needEl.hidden = true;
-        var cards = EpitaphData.search({ name: name, year: year });
-        emptyEl.hidden = cards.length > 0;
-        cards.forEach(function (card) {
+        var seq = ++searchSeq;
+        EpitaphData.search({ name: name, year: year }, function (err, cards, message) {
+          if (seq !== searchSeq) return;
+          cloudEl.hidden = !message;
+          cloudEl.textContent = message || "";
+          resultsEl.innerHTML = "";
+          emptyEl.hidden = cards.length > 0;
+          cards.forEach(drawCard);
+        });
+        return;
+      }
+
+      function drawCard(card) {
           var article = document.createElement("article");
           article.className = "result-card";
 
@@ -96,7 +111,6 @@
           article.appendChild(line);
           article.appendChild(open);
           resultsEl.appendChild(article);
-        });
       }
 
       function addText(parent, className, text) {
@@ -110,11 +124,17 @@
       function renderDetail(id) {
         var box = document.getElementById("detail");
         box.innerHTML = "";
-        var rec = EpitaphData.getPublic(id);
-        if (!rec) {
-          addText(box, "empty-hint", "没有找到这块公开的碑。");
-          return;
-        }
+        EpitaphData.getPublic(id, function (err, rec, message) {
+          if (!rec) {
+            addText(box, "empty-hint", message || "没有找到这块公开的碑。");
+            return;
+          }
+          drawDetail(box, rec);
+        });
+        return;
+      }
+
+      function drawDetail(box, rec) {
 
         var title = document.createElement("h1");
         title.className = "stele-name";

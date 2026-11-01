@@ -9,6 +9,7 @@
 <body>
   <div class="app app-pay" id="app">
     <p class="demo-banner" role="status">预览演示，不会真扣钱</p>
+    <p class="pay-forge">当前是演示支付。网页写入的「已付费」标记，在接入真实支付并由服务器确认之前，可以被伪造。</p>
 
     <section id="pay-view">
       <header class="search-hero">
@@ -47,10 +48,13 @@
       <h1 class="search-title">支付成功</h1>
       <p class="pay-buys">这座碑已保存。回到预览后，就可以打开「公开」。</p>
       <p class="pay-note">这是模拟支付，没有扣款。</p>
+      <p class="cloud-note" id="pay-cloud-note" hidden></p>
       <button type="button" class="btn btn-primary" id="btn-back-preview">返回预览</button>
     </section>
   </div>
 
+  <script src="js/config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js"></script>
   <script src="js/app.js"></script>
   <script>
     (function () {
@@ -108,12 +112,18 @@
             EpitaphApp.toast("模拟支付没有完成");
             return;
           }
-          if (!EpitaphData.markPaid(data, receipt)) {
-            EpitaphApp.toast("保存失败，请稍后再试");
-            return;
-          }
-          document.getElementById("pay-view").hidden = true;
-          document.getElementById("success-view").hidden = false;
+          EpitaphData.markPaid(data, receipt, function (err, ok, message) {
+            if (!ok) {
+              EpitaphApp.toast("保存失败，请稍后再试");
+              return;
+            }
+            var note = document.getElementById("pay-cloud-note");
+            note.hidden = !message;
+            note.textContent = message || "";
+            document.getElementById("pay-view").hidden = true;
+            document.getElementById("success-view").hidden = false;
+          });
+          return;
         });
       };
 

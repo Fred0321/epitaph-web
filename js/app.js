@@ -386,31 +386,311 @@
     };
   }
 
+  function isUuid(value) {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(value || ""));
+  }
+
+  function cloudMessage(error) {
+    var text = "";
+    var code = "";
+    if (error) {
+      text = String(error.message || error.msg || error.error_code || error);
+      code = String(error.code || error.error_code || error.status || "");
+    }
+    var blob = text + " " + code;
+    if (/anonymous_provider_disabled|anonymous sign-ins are disabled/i.test(blob)) {
+      return "云端匿名登录还没打开。请在 Supabase 的 Authentication → Sign In / Providers 里启用 Anonymous sign-ins。当前只使用本机和示例。";
+    }
+    if (/PGRST205|schema cache|does not exist|Could not find the table|relation .* does not exist|42P01/i.test(blob)) {
+      return "云端数据表还没建好。请到 Supabase SQL Editor 运行仓库里的 supabase/schema.sql。当前只显示本机和示例。";
+    }
+    if (/no-cloud|Failed to fetch|NetworkError|Load failed/i.test(blob)) {
+      return "暂时连不上云端，已改用本机和示例。";
+    }
+    if (error) return "暂时连不上云端，已改用本机和示例。";
+    return "";
+  }
+
+  var cloudClient = null;
+
+  function getCloud() {
+    var cfg = global.EPITAPH_SUPABASE;
+    var lib = global.supabase;
+    if (!cfg || !cfg.url || !cfg.key || !lib || typeof lib.createClient !== "function") return null;
+    if (!cloudClient) {
+      cloudClient = lib.createClient(cfg.url, cfg.key, {
+        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
+      });
+    }
+    return cloudClient;
+  }
+
+  function ensureSession(callback) {
+    var client = getCloud();
+    var settled = false;
+    function finish(err, session) {
+      if (settled) return;
+      settled = true;
+      callback(err, session || null);
+    }
+    if (!client) {
+      finish(new Error("no-cloud"));
+      return;
+    }
+    client.auth.getSession().then(function (res) {
+      var session = res && res.data && res.data.session;
+      if (session && session.user) {
+        finish(null, session);
+        return null;
+      }
+      return client.auth.signInAnonymously();
+    }).then(function (out) {
+      if (!out || settled) return;
+      if (out.error || !out.data || !out.data.session) {
+        finish(out.error || new Error("anon"));
+        return;
+      }
+      finish(null, out.data.session);
+    }).catch(function (err) {
+      finish(err);
+    });
+  }
+
+  function rememberCloudId(data, cloudId) {
+    if (!data || !cloudId) return;
+    data.cloudId = cloudId;
+    save(data);
+    var list = LocalAdapter.readSaved();
+    var changed = false;
+    for (var i = 0; i < list.length; i++) {
+      if (list[i] && list[i].id === data.shareId) {
+        list[i].cloudId = cloudId;
+        changed = true;
+      }
+    }
+    if (changed) LocalAdapter.writeSaved(list);
+  }
+
+  var CloudStore = {
+    searchCards: function (name, year, callback) {
+      ensureSession(function (err) {
+        if (err) {
+          callback(err, [], cloudMessage(err));
+          return;
+        }
+        var client = getCloud();
+        var query = client.from("steles_public_cards").select("id,name,birth_year,death_year,epitaph");
+        if (name) {
+          var safeName = String(name).replace(/[%_,.()]/g, "");
+          if (safeName) query = query.ilike("name", "%" + safeName + "%");
+        }
+        if (year) {
+          var yearNum = Number(year);
+          query = query.or("birth_year.eq." + yearNum + ",death_year.eq." + yearNum);
+        }
+        query.limit(50).then(function (res) {
+          if (res.error) {
+            callback(res.error, [], cloudMessage(res.error));
+            return;
+          }
+          var cards = (res.data || []).map(function (row) {
+            return {
+              id: row.id,
+              name: row.name || "",
+              years: formatYears({ birthYear: row.birth_year, deathYear: row.death_year }),
+              epitaph: row.epitaph || ""
+            };
+          });
+          callback(null, cards, "");
+        }).catch(function (fetchErr) {
+          callback(fetchErr, [], cloudMessage(fetchErr));
+        });
+      });
+    },
+    fetchDetail: function (id, callback) {
+      if (!isUuid(id)) {
+        callback(null, null, "");
+        return;
+      }
+      ensureSession(function (err) {
+        if (err) {
+          callback(err, null, cloudMessage(err));
+          return;
+        }
+        getCloud().from("steles").select("id,name,birth_year,death_year,hometown,epitaph,content,is_public,paid").eq("id", id).maybeSingle().then(function (res) {
+          if (res.error) {
+            callback(res.error, null, cloudMessage(res.error));
+            return;
+          }
+          if (!res.data || res.data.is_public !== true || res.data.paid !== true) {
+            callback(null, null, "");
+            return;
+          }
+          var body = res.data.content || {};
+          callback(null, {
+            id: res.data.id,
+            name: res.data.name || "",
+            hometown: res.data.hometown || "",
+            birthYear: res.data.birth_year || null,
+            deathYear: res.data.death_year || null,
+            epitaph: res.data.epitaph || "",
+            events: body.events || [],
+            familyMessage: body.familyMessage || "",
+            isPublic: true,
+            paid: true,
+            source: "cloud"
+          }, "");
+        }).catch(function (fetchErr) {
+          callback(fetchErr, null, cloudMessage(fetchErr));
+        });
+      });
+    },
+    upsertPaid: function (data, rec, callback) {
+      ensureSession(function (err, session) {
+        if (err) {
+          callback(err, null, cloudMessage(err));
+          return;
+        }
+        var row = {
+          owner: session.user.id,
+          name: rec.name || "",
+          birth_year: rec.birthYear || null,
+          death_year: rec.deathYear || null,
+          hometown: rec.hometown || null,
+          epitaph: rec.epitaph || "",
+          content: {
+            events: rec.events || [],
+            familyMessage: rec.familyMessage || "",
+            role: rec.role || "self",
+            photoSlots: data.photoSlots || 0
+          },
+          is_public: rec.isPublic === true,
+          paid: true
+        };
+        var query;
+        if (isUuid(data.cloudId)) {
+          query = getCloud().from("steles").update(row).eq("id", data.cloudId).select("id").single();
+        } else {
+          query = getCloud().from("steles").insert(row).select("id").single();
+        }
+        query.then(function (res) {
+          if (res.error) {
+            callback(res.error, null, cloudMessage(res.error));
+            return;
+          }
+          var cloudId = res.data && res.data.id;
+          rememberCloudId(data, cloudId);
+          callback(null, cloudId, "");
+        }).catch(function (fetchErr) {
+          callback(fetchErr, null, cloudMessage(fetchErr));
+        });
+      });
+    }
+  };
+
+  function queryParts(criteria) {
+    var opts = criteria || {};
+    return {
+      name: String(opts.name || "").trim(),
+      year: String(opts.year == null ? "" : opts.year).trim()
+    };
+  }
+
+  function cardsMatching(list, name, year) {
+    if (!name && !year) return [];
+    if (year && !/^\d+$/.test(year)) return [];
+    var seen = {};
+    var out = [];
+    (list || []).forEach(function (rec) {
+      if (!rec || !rec.id || seen[rec.id]) return;
+      if (rec.isPublic !== true || rec.paid !== true) return;
+      if (name && !nameHit(rec, name)) return;
+      if (year && !exactYearHit(rec, year)) return;
+      seen[rec.id] = true;
+      out.push(toCard(rec));
+    });
+    return out;
+  }
+
+  function mergeCards(first, second) {
+    var seen = {};
+    var out = [];
+    first.concat(second).forEach(function (card) {
+      if (!card || !card.id || seen[card.id]) return;
+      seen[card.id] = true;
+      out.push({
+        id: card.id,
+        name: card.name || "",
+        years: card.years || "",
+        epitaph: card.epitaph || ""
+      });
+    });
+    return out;
+  }
+
   /**
-   * 搜索与读取的唯一入口。返回的卡片只有姓名、年份、墓志铭一行。
-   * 姓名为包含匹配，年份须与生年或卒年完全相同。两个都填则同时满足。
-   * 不按籍贯过滤，也不把籍贯放进卡片。未公开或未付费的碑不会离开这一层。
+   * 搜索与读取的唯一入口。卡片只有姓名、年份、墓志铭一行。
+   * 云端可用时：示例 + steles_public_cards。云端不可用时退回本机已付费公开记录和示例。
+   * 不按籍贯过滤。未公开或未付费的碑不会出现。
    */
   var EpitaphData = {
     formatYears: formatYears,
-    search: function (criteria) {
-      var opts = criteria || {};
-      var name = String(opts.name || "").trim();
-      var year = String(opts.year == null ? "" : opts.year).trim();
-      if (!name && !year) return [];
-      return collectPublic().filter(function (rec) {
-        if (name && !nameHit(rec, name)) return false;
-        if (year && !exactYearHit(rec, year)) return false;
-        return true;
-      }).map(toCard);
-    },
-    getPublic: function (id) {
-      if (!id) return null;
-      var list = collectPublic();
-      for (var i = 0; i < list.length; i++) {
-        if (list[i].id === id) return clone(list[i]);
+    search: function (criteria, callback) {
+      var parts = queryParts(criteria);
+      var samples = cardsMatching(LocalAdapter.readSamples().map(function (item) {
+        return asStele(item, "sample");
+      }), parts.name, parts.year);
+      var localCards = cardsMatching(collectPublic(), parts.name, parts.year);
+      if (!parts.name && !parts.year) {
+        if (typeof callback === "function") callback(null, [], "");
+        return [];
       }
-      return null;
+      if (parts.year && !/^\d+$/.test(parts.year)) {
+        if (typeof callback === "function") callback(null, [], "");
+        return [];
+      }
+      if (typeof callback !== "function") return localCards;
+      CloudStore.searchCards(parts.name, parts.year, function (err, cloudCards, message) {
+        if (err) {
+          callback(err, localCards, message || cloudMessage(err));
+          return;
+        }
+        callback(null, mergeCards(samples, cloudCards), "");
+      });
+      return localCards;
+    },
+    getPublic: function (id, callback) {
+      var local = null;
+      if (id) {
+        var list = collectPublic();
+        for (var i = 0; i < list.length; i++) {
+          if (list[i].id === id) {
+            local = clone(list[i]);
+            break;
+          }
+        }
+      }
+      if (typeof callback !== "function") return local;
+      if (!id) {
+        callback(null, null, "");
+        return null;
+      }
+      if (local && local.source === "sample") {
+        callback(null, local, "");
+        return local;
+      }
+      CloudStore.fetchDetail(id, function (err, rec, message) {
+        if (rec) {
+          callback(null, rec, "");
+          return;
+        }
+        if (local && local.isPublic === true && local.paid === true) {
+          callback(err, local, message || "");
+          return;
+        }
+        callback(err, null, message || "");
+      });
+      return local;
     },
     hasSaved: function (id) {
       if (!id) return false;
@@ -440,22 +720,25 @@
      * 记下已模拟支付。不自动公开。
      * 真实微信支付 / 支付宝接入后，仍由这里写入 paid。
      */
-    markPaid: function (draft, receipt) {
+    markPaid: function (draft, receipt, callback) {
       var data = draft || {};
       data.paid = true;
       data.payMethod = (receipt && receipt.method) || "";
       data.paidAt = Date.now();
       var okDraft = save(data);
-      var okList = EpitaphData.saveStele(data);
-      return okDraft && okList;
+      return EpitaphData.saveStele(data, function (err, ok, message) {
+        if (typeof callback === "function") callback(err, okDraft && ok, message);
+      });
     },
-    saveStele: function (draft) {
+    saveStele: function (draft, callback) {
+      var ok = false;
+      var data = draft || {};
+      var rec = null;
       try {
-        var data = draft || {};
         if (!data.shareId) data.shareId = uid("stele");
         var years = deriveYears(data);
         var paid = data.paid === true;
-        var rec = {
+        rec = {
           id: data.shareId,
           name: data.name || "",
           hometown: data.hometown || "",
@@ -469,6 +752,7 @@
           paid: paid,
           payMethod: paid ? (data.payMethod || "") : "",
           paidAt: paid ? (data.paidAt || null) : null,
+          cloudId: isUuid(data.cloudId) ? data.cloudId : null,
           source: "local",
           savedAt: Date.now()
         };
@@ -477,10 +761,18 @@
         });
         list.unshift(rec);
         LocalAdapter.writeSaved(list);
-        return true;
+        ok = true;
       } catch (e) {
-        return false;
+        ok = false;
       }
+      if (!ok || !rec || rec.paid !== true) {
+        if (typeof callback === "function") callback(ok ? null : new Error("save"), ok, "");
+        return ok;
+      }
+      CloudStore.upsertPaid(data, rec, function (err, cloudId, message) {
+        if (typeof callback === "function") callback(err, ok, message || "");
+      });
+      return ok;
     }
   };
 
