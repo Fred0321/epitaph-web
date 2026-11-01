@@ -156,11 +156,18 @@
     };
   }
 
+  function sameYear(a, b) {
+    var left = a ? Number(a) : null;
+    var right = b ? Number(b) : null;
+    if (!left && !right) return true;
+    return left === right;
+  }
+
   function samePerson(bound, current) {
-    if (!bound || !current) return true;
-    if (bound.name && current.name && bound.name !== current.name) return false;
-    if (bound.birthYear && current.birthYear && Number(bound.birthYear) !== Number(current.birthYear)) return false;
-    if (bound.deathYear && current.deathYear && Number(bound.deathYear) !== Number(current.deathYear)) return false;
+    if (!bound || !current) return false;
+    if ((bound.name || "") !== (current.name || "")) return false;
+    if (!sameYear(bound.birthYear, current.birthYear)) return false;
+    if (!sameYear(bound.deathYear, current.deathYear)) return false;
     return true;
   }
 
@@ -198,19 +205,15 @@
       return changed;
     }
     var current = identityOf(data);
+    /* 已保存列表里的姓名/年份可能已被这次编辑覆盖，不能拿来当付费凭据。
+       没有冻结的 paidIdentity 时，只有仍与示例「王德福 1958」一致的示例 id 可以继续算已付费。 */
     var bound = null;
-    if (data.shareId === SAMPLE.shareId) {
-      bound = identityOf(SAMPLE);
-    } else if (data.paidIdentity && data.paidIdentity.name) {
+    if (data.paidIdentity && (data.paidIdentity.name || data.paidIdentity.birthYear)) {
       bound = data.paidIdentity;
-    } else if (saved && saved.paid === true) {
-      bound = {
-        name: normalizeName(saved.name),
-        birthYear: saved.birthYear || null,
-        deathYear: saved.deathYear || null
-      };
+    } else if (data.shareId === SAMPLE.shareId) {
+      bound = identityOf(SAMPLE);
     }
-    if (bound && !samePerson(bound, current)) {
+    if (!bound || !samePerson(bound, current)) {
       detachPayment(data);
       return true;
     }
@@ -410,9 +413,9 @@
   }
 
   function deriveYears(draft) {
-    var birth = draft.birthYear ? Number(draft.birthYear) : 0;
-    var death = draft.deathYear ? Number(draft.deathYear) : 0;
-    var events = sortEvents(draft.events || []);
+    var birth = null;
+    var death = null;
+    var events = sortEvents((draft && draft.events) || []);
     for (var i = 0; i < events.length; i++) {
       var title = events[i].title || "";
       var year = Number(events[i].year);
@@ -420,6 +423,9 @@
       if (!birth && /出生|生于/.test(title)) birth = year;
       if (!death && /去世|逝世|辞世|离世|病逝|仙逝/.test(title)) death = year;
     }
+    if (!birth && events.length && Number(events[0].year)) birth = Number(events[0].year);
+    if (!birth && draft && draft.birthYear) birth = Number(draft.birthYear);
+    if (!death && draft && draft.deathYear) death = Number(draft.deathYear);
     return {
       birthYear: birth || null,
       deathYear: death || null
@@ -535,15 +541,36 @@
   var cloudClient = null;
 
   function getCloud() {
-    var cfg = global.EPITAPH_SUPABASE;
-    var lib = global.supabase;
-    if (!cfg || !cfg.url || !cfg.key || !lib || typeof lib.createClient !== "function") return null;
-    if (!cloudClient) {
-      cloudClient = lib.createClient(cfg.url, cfg.key, {
-        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
-      });
+    try {
+      var cfg = global.EPITAPH_SUPABASE;
+      var lib = global.supabase;
+      if (!cfg || !cfg.url || !cfg.key || !lib || typeof lib.createClient !== "function") return null;
+      if (!cloudClient) {
+        cloudClient = lib.createClient(cfg.url, cfg.key, {
+          auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
+        });
+      }
+      return cloudClient;
+    } catch (e) {
+      cloudClient = null;
+      return null;
     }
-    return cloudClient;
+  }
+
+  function loadSupabaseLater() {
+    try {
+      if (!global.document || global.EPITAPH_SUPABASE_FAILED) return;
+      if (global.supabase && typeof global.supabase.createClient === "function") return;
+      if (document.querySelector("script[data-epitaph-supabase]")) return;
+      var tag = document.createElement("script");
+      tag.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js";
+      tag.async = true;
+      tag.setAttribute("data-epitaph-supabase", "1");
+      tag.onerror = function () { global.EPITAPH_SUPABASE_FAILED = true; };
+      (document.head || document.documentElement).appendChild(tag);
+    } catch (e) {
+      global.EPITAPH_SUPABASE_FAILED = true;
+    }
   }
 
   function ensureSession(callback) {
@@ -937,4 +964,5 @@
     }
   };
   global.EpitaphPay = EpitaphPay;
+  loadSupabaseLater();
 })(window);

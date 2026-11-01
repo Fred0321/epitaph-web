@@ -2,9 +2,12 @@
 <html lang="zh-Hans-CN">
 <head>
   <meta charset="UTF-8" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>预览碑页 · 数字碑</title>
-  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/styles.css?v=20261101h" />
 </head>
 <body>
   <div class="app" id="app">
@@ -65,18 +68,62 @@
     <div id="ornament"></div>
   </div>
 
-  <script src="js/config.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js"></script>
-  <script src="js/app.js"></script>
+  <script src="js/config.js?v=20261101h"></script>
+  <script src="js/app.js?v=20261101h"></script>
   <script>
     (function () {
       var app = document.getElementById("app");
       app.insertAdjacentHTML("afterbegin", EpitaphApp.pineCornerHtml());
       document.getElementById("ornament").outerHTML = EpitaphApp.ornamentHtml();
 
-      var data = EpitaphApp.load();
+      var data;
+      try { data = EpitaphApp.load(); } catch (e) { data = { paid: false, isPublic: false, events: [] }; }
+
+      function draftIsUnpaid() {
+        try {
+          return EpitaphData.isPaid(EpitaphApp.load()) !== true;
+        } catch (err) {
+          return true;
+        }
+      }
+
+      function goPay() {
+        window.location.href = "pay.html?from=preview.html";
+      }
+
+      var pubEl = document.getElementById("is-public");
+      pubEl.addEventListener("click", function (event) {
+        if (!draftIsUnpaid()) return;
+        event.preventDefault();
+        goPay();
+      });
+
+      document.getElementById("btn-save").onclick = function () {
+        if (draftIsUnpaid()) {
+          goPay();
+          return;
+        }
+        try { data = EpitaphApp.load(); } catch (e) { goPay(); return; }
+        data.isPublic = pubEl.checked && data.paid === true;
+        var okDraft = EpitaphApp.save(data);
+        EpitaphData.saveStele(data, function (err, ok, message) {
+          if (!okDraft || !ok) {
+            EpitaphApp.toast("保存失败，请稍后再试");
+            return;
+          }
+          if (message) {
+            EpitaphApp.toast(message);
+            return;
+          }
+          EpitaphApp.toast(data.isPublic ? "已保存，搜索里可以找到" : "已保存。公开仍是关闭的");
+        });
+      };
+
       if (!data.shareId) {
-        data.shareId = "demo-" + EpitaphApp.uid("s").slice(-8);
+        data.shareId = EpitaphApp.uid("stele");
+        data.paid = false;
+        data.isPublic = false;
+        data.paidIdentity = null;
         EpitaphApp.save(data);
       }
 
@@ -115,66 +162,36 @@
         EpitaphApp.copyText(url);
       };
 
-      if (EpitaphData.isPaid(data)) data.paid = true;
-      if (data.isPublic === true && !data.paid) {
-        data.isPublic = false;
-        EpitaphApp.save(data);
-        if (EpitaphData.hasSaved(data.shareId)) EpitaphData.saveStele(data);
-      }
+      try {
+        if (data.isPublic === true && data.paid !== true) {
+          data.isPublic = false;
+          EpitaphApp.save(data);
+        }
+      } catch (e) { /* 付费判断失败时保持未公开 */ }
 
-      var pubEl = document.getElementById("is-public");
       var helpEl = document.getElementById("public-help");
       pubEl.checked = data.isPublic === true && data.paid === true;
-      if (data.paid) {
+      if (data.paid === true) {
         helpEl.textContent = "已完成模拟支付。打开后，这座碑会出现在搜索里。";
       }
 
-      pubEl.addEventListener("click", function (event) {
-        if (!pubEl.checked && !EpitaphData.isPaid(data)) {
-          event.preventDefault();
-          window.location.href = "pay.html?from=preview.html";
-        }
-      });
-
       pubEl.addEventListener("change", function () {
-        if (pubEl.checked && !EpitaphData.isPaid(data)) {
+        if (draftIsUnpaid()) {
           pubEl.checked = false;
-          data.isPublic = false;
-          window.location.href = "pay.html?from=preview.html";
+          goPay();
           return;
         }
-        data.isPublic = pubEl.checked && EpitaphData.isPaid(data);
+        try { data = EpitaphApp.load(); } catch (e) { goPay(); return; }
+        data.isPublic = pubEl.checked === true;
         EpitaphApp.save(data);
-        if (EpitaphData.hasSaved(data.shareId) || data.paid) {
-          EpitaphData.saveStele(data, function (err, ok, message) {
-            if (!ok) {
-              EpitaphApp.toast("保存失败，请稍后再试");
-              return;
-            }
-            EpitaphApp.toast(message || (data.isPublic ? "已设为公开" : "已改为不公开"));
-          });
-        }
-      });
-
-      document.getElementById("btn-save").onclick = function () {
-        if (!EpitaphData.isPaid(data)) {
-          window.location.href = "pay.html?from=preview.html";
-          return;
-        }
-        data.isPublic = pubEl.checked && data.paid === true;
-        var okDraft = EpitaphApp.save(data);
         EpitaphData.saveStele(data, function (err, ok, message) {
-          if (!okDraft || !ok) {
+          if (!ok) {
             EpitaphApp.toast("保存失败，请稍后再试");
             return;
           }
-          if (message) {
-            EpitaphApp.toast(message);
-            return;
-          }
-          EpitaphApp.toast(data.isPublic ? "已保存，搜索里可以找到" : "已保存。公开仍是关闭的");
+          EpitaphApp.toast(message || (data.isPublic ? "已设为公开" : "已改为不公开"));
         });
-      };
+      });
 
       document.getElementById("btn-new").onclick = function () {
         EpitaphApp.startNewStele(data.role || "self");
