@@ -143,21 +143,119 @@
     return (prefix || "id") + "_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   }
 
+  function normalizeName(name) {
+    return String(name || "").replace(/[\s\u3000]+/g, "");
+  }
+
+  function identityOf(draft) {
+    var years = deriveYears(draft || {});
+    return {
+      name: normalizeName(draft && draft.name),
+      birthYear: years.birthYear || null,
+      deathYear: years.deathYear || null
+    };
+  }
+
+  function samePerson(bound, current) {
+    if (!bound || !current) return true;
+    if (bound.name && current.name && bound.name !== current.name) return false;
+    if (bound.birthYear && current.birthYear && Number(bound.birthYear) !== Number(current.birthYear)) return false;
+    if (bound.deathYear && current.deathYear && Number(bound.deathYear) !== Number(current.deathYear)) return false;
+    return true;
+  }
+
+  function findSaved(id) {
+    if (!id) return null;
+    var list = LocalAdapter.readSaved();
+    for (var i = 0; i < list.length; i++) {
+      if (list[i] && list[i].id === id) return list[i];
+    }
+    return null;
+  }
+
+  function detachPayment(data) {
+    data.shareId = uid("stele");
+    data.paid = false;
+    data.isPublic = false;
+    data.payMethod = "";
+    data.paidAt = null;
+    data.cloudId = null;
+    data.paidIdentity = null;
+    return data;
+  }
+
+  /* 付费只属于一座碑。改成另一个人或另一组生卒年，就换新 id，并不再继承 paid。 */
+  function reconcileDraft(data) {
+    if (!data) return false;
+    var changed = false;
+    var saved = findSaved(data.shareId);
+    var marked = data.paid === true || !!(saved && saved.paid === true);
+    if (!marked) {
+      if (data.paid) {
+        data.paid = false;
+        changed = true;
+      }
+      return changed;
+    }
+    var current = identityOf(data);
+    var bound = null;
+    if (data.shareId === SAMPLE.shareId) {
+      bound = identityOf(SAMPLE);
+    } else if (data.paidIdentity && data.paidIdentity.name) {
+      bound = data.paidIdentity;
+    } else if (saved && saved.paid === true) {
+      bound = {
+        name: normalizeName(saved.name),
+        birthYear: saved.birthYear || null,
+        deathYear: saved.deathYear || null
+      };
+    }
+    if (bound && !samePerson(bound, current)) {
+      detachPayment(data);
+      return true;
+    }
+    if (data.paid !== true) {
+      data.paid = true;
+      changed = true;
+    }
+    if (bound && !data.paidIdentity) {
+      data.paidIdentity = bound;
+      changed = true;
+    }
+    return changed;
+  }
+
+  function unpaidCopy(source) {
+    var copy = JSON.parse(JSON.stringify(source || SAMPLE));
+    copy.shareId = uid("stele");
+    copy.paid = false;
+    copy.isPublic = false;
+    copy.payMethod = "";
+    copy.paidAt = null;
+    copy.cloudId = null;
+    copy.paidIdentity = null;
+    return copy;
+  }
+
   function load() {
+    var data;
     try {
       var raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) {
-        save(SAMPLE);
-        return JSON.parse(JSON.stringify(SAMPLE));
-      }
-      return JSON.parse(raw);
+      data = raw ? JSON.parse(raw) : unpaidCopy(SAMPLE);
     } catch (e) {
-      return JSON.parse(JSON.stringify(SAMPLE));
+      data = unpaidCopy(SAMPLE);
     }
+    if (reconcileDraft(data) || !localStorage.getItem(STORAGE_KEY)) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      } catch (err) { /* ignore quota */ }
+    }
+    return data;
   }
 
   function save(data) {
     try {
+      reconcileDraft(data);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
       return true;
     } catch (e) {
@@ -166,8 +264,31 @@
   }
 
   function resetSample() {
-    save(SAMPLE);
-    return JSON.parse(JSON.stringify(SAMPLE));
+    var copy = unpaidCopy(SAMPLE);
+    save(copy);
+    return copy;
+  }
+
+  function startNewStele(role) {
+    var draft = {
+      role: role || "self",
+      name: "",
+      years: "",
+      epitaph: "",
+      templateId: "",
+      events: [],
+      photoSlots: 2,
+      familyMessage: "",
+      shareId: uid("stele"),
+      isPublic: false,
+      paid: false,
+      payMethod: "",
+      paidAt: null,
+      cloudId: null,
+      paidIdentity: null
+    };
+    save(draft);
+    return draft;
   }
 
   function getShareUrl(shareId) {
@@ -699,14 +820,9 @@
       });
     },
     isPaid: function (draft) {
-      if (draft && draft.paid === true) return true;
-      var id = draft && (draft.shareId || draft.id);
-      if (!id) return false;
-      var list = LocalAdapter.readSaved();
-      for (var i = 0; i < list.length; i++) {
-        if (list[i] && list[i].id === id && list[i].paid === true) return true;
-      }
-      return false;
+      if (!draft) return false;
+      if (reconcileDraft(draft)) save(draft);
+      return draft.paid === true;
     },
     describeDraft: function (draft) {
       var stele = asStele(draft || {}, "local");
@@ -723,6 +839,7 @@
     markPaid: function (draft, receipt, callback) {
       var data = draft || {};
       data.paid = true;
+      data.paidIdentity = identityOf(data);
       data.payMethod = (receipt && receipt.method) || "";
       data.paidAt = Date.now();
       var okDraft = save(data);
@@ -782,6 +899,7 @@
     load: load,
     save: save,
     resetSample: resetSample,
+    startNewStele: startNewStele,
     uid: uid,
     getShareUrl: getShareUrl,
     toast: toast,

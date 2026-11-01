@@ -24,12 +24,14 @@
     </div>
 
     <div class="entry-grid">
+      <button type="button" class="entry-primary" id="btn-new">新建一座碑</button>
       <button type="button" class="entry-primary" id="btn-self">
         本人来写
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20 V9 M12 10 L7 15 M12 10 L17 15 M12 6 L9.5 10 M12 6 L14.5 10" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
       </button>
       <button type="button" class="entry-secondary" id="btn-family">家人代写</button>
     </div>
+    <p class="center muted" style="margin-top:0.85rem;">新建从空白开始，不沿用上一座碑的付费。</p>
 
     <div class="hint-row">
       <span class="badge-da">大</span>
@@ -56,16 +58,21 @@
       var data = EpitaphApp.load();
 
       function go(role) {
-        data.role = role;
-        EpitaphApp.save(data);
+        var current = EpitaphApp.load();
+        current.role = role;
+        EpitaphApp.save(current);
         window.location.href = "epitaph.html";
       }
 
+      document.getElementById("btn-new").onclick = function () {
+        EpitaphApp.startNewStele("self");
+        window.location.href = "epitaph.html";
+      };
       document.getElementById("btn-self").onclick = function () { go("self"); };
       document.getElementById("btn-family").onclick = function () { go("family"); };
       document.getElementById("btn-reset").onclick = function () {
         EpitaphApp.resetSample();
-        EpitaphApp.toast("已恢复示例草稿");
+        EpitaphApp.toast("已恢复示例，这笔草稿尚未付费");
       };
 
       EpitaphApp.mountTabbar("home", false);

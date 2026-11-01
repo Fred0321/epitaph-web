@@ -52,6 +52,7 @@
       <button type="button" class="btn btn-primary" id="btn-save">保存</button>
       <button type="button" class="btn btn-primary" id="btn-copy">复制链接</button>
       <a class="btn btn-primary" href="epitaph.html" id="btn-edit">再改改</a>
+      <button type="button" class="btn btn-secondary" id="btn-new">新建一座碑</button>
     </div>
 
     <p class="share-note">家人打开链接即可阅读</p>
@@ -173,6 +174,11 @@
           }
           EpitaphApp.toast(data.isPublic ? "已保存，搜索里可以找到" : "已保存。公开仍是关闭的");
         });
+      };
+
+      document.getElementById("btn-new").onclick = function () {
+        EpitaphApp.startNewStele(data.role || "self");
+        window.location.href = "epitaph.html";
       };
 
       EpitaphApp.mountTabbar("mine", false);
