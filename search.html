@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh-Hans-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>寻找一方碑 · 数字碑</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="app app-search" id="app">
+    <section id="search-view">
+      <header class="search-hero">
+        <h1 class="search-title">寻找一方碑</h1>
+        <div class="search-pine" id="search-pine" aria-hidden="true"></div>
+      </header>
+
+      <form id="search-form" class="search-form" role="search">
+        <div class="search-row">
+          <label class="sr-only" for="q">按姓名或生卒年搜索</label>
+          <input type="search" id="q" placeholder="输入姓名或生卒年" autocomplete="off" enterkeyhint="search" />
+          <button type="submit" class="btn btn-primary search-submit">搜索</button>
+        </div>
+        <div class="chip-row" role="group" aria-label="搜索范围">
+          <button type="button" class="chip" id="chip-name" aria-pressed="false">姓名</button>
+          <button type="button" class="chip" id="chip-year" aria-pressed="false">生卒年</button>
+        </div>
+      </form>
+
+      <div id="results"></div>
+      <p class="empty-hint" id="empty" hidden>没有找到相符的碑。请换个姓名或生卒年试试。</p>
+      <p class="search-scope-note">目前只能搜到本机保存并公开的碑和示例，接入云端后可搜全站</p>
+    </section>
+
+    <section id="detail-view" hidden>
+      <button type="button" class="btn btn-ghost detail-back" id="btn-back">返回搜索</button>
+      <article class="stele" id="detail" aria-label="碑文"></article>
+    </section>
+  </div>
+
+  <script src="js/app.js"></script>
+  <script>
+    (function () {
+      var form = document.getElementById("search-form");
+      var input = document.getElementById("q");
+      var resultsEl = document.getElementById("results");
+      var emptyEl = document.getElementById("empty");
+      var chipName = document.getElementById("chip-name");
+      var chipYear = document.getElementById("chip-year");
+      var mode = "all";
+
+      document.getElementById("search-pine").innerHTML = EpitaphApp.PINE_SVG;
+      EpitaphApp.mountTabbar("search", false);
+
+      function setMode(next) {
+        mode = next;
+        chipName.setAttribute("aria-pressed", next === "name" ? "true" : "false");
+        chipYear.setAttribute("aria-pressed", next === "year" ? "true" : "false");
+        renderResults();
+      }
+
+      chipName.onclick = function () {
+        setMode(mode === "name" ? "all" : "name");
+      };
+      chipYear.onclick = function () {
+        setMode(mode === "year" ? "all" : "year");
+      };
+
+      function renderResults() {
+        var cards = EpitaphData.search({ query: input.value, mode: mode });
+        resultsEl.innerHTML = "";
+        emptyEl.hidden = cards.length > 0;
+        cards.forEach(function (card) {
+          var article = document.createElement("article");
+          article.className = "result-card";
+
+          var head = document.createElement("div");
+          head.className = "result-head";
+
+          var name = document.createElement("h2");
+          name.className = "result-name";
+          name.textContent = card.name || "（未填姓名）";
+          head.appendChild(name);
+
+          if (card.years) {
+            var years = document.createElement("p");
+            years.className = "result-years";
+            years.textContent = card.years;
+            head.appendChild(years);
+          }
+
+          var line = document.createElement("p");
+          line.className = "result-epitaph";
+          line.textContent = card.epitaph || "（无墓志铭）";
+
+          var open = document.createElement("a");
+          open.className = "btn btn-primary result-open";
+          open.href = "#" + encodeURIComponent(card.id);
+          open.textContent = "查看碑文";
+
+          article.appendChild(head);
+          article.appendChild(line);
+          article.appendChild(open);
+          resultsEl.appendChild(article);
+        });
+      }
+
+      function addText(parent, className, text) {
+        var el = document.createElement("p");
+        el.className = className;
+        el.textContent = text;
+        parent.appendChild(el);
+        return el;
+      }
+
+      function renderDetail(id) {
+        var box = document.getElementById("detail");
+        box.innerHTML = "";
+        var rec = EpitaphData.getPublic(id);
+        if (!rec) {
+          addText(box, "empty-hint", "没有找到这块公开的碑。");
+          return;
+        }
+
+        var title = document.createElement("h1");
+        title.className = "stele-name";
+        title.textContent = rec.name || "（未填姓名）";
+        box.appendChild(title);
+
+        var years = EpitaphData.formatYears(rec);
+        if (years) addText(box, "detail-hometown", years);
+        if (rec.hometown) addText(box, "detail-hometown", "籍贯 " + rec.hometown);
+        addText(box, "stele-epitaph", rec.epitaph || "（无墓志铭）");
+
+        var events = EpitaphApp.sortEvents(rec.events || []);
+        if (events.length) {
+          var section = document.createElement("div");
+          section.className = "stele-section";
+          var h4 = document.createElement("h4");
+          h4.textContent = "生平纪年";
+          section.appendChild(h4);
+          var ul = document.createElement("ul");
+          ul.className = "stele-tl";
+          events.forEach(function (ev) {
+            var li = document.createElement("li");
+            var y = document.createElement("span");
+            y.className = "y";
+            y.textContent = (ev.year || "") + "年";
+            li.appendChild(y);
+            li.appendChild(document.createTextNode(" · " + (ev.title || "")));
+            if (ev.note) li.appendChild(document.createTextNode(" " + ev.note));
+            ul.appendChild(li);
+          });
+          section.appendChild(ul);
+          box.appendChild(section);
+        }
+
+        var msg = (rec.familyMessage || "").trim();
+        if (msg) {
+          var msgSection = document.createElement("div");
+          msgSection.className = "stele-section";
+          var msgTitle = document.createElement("h4");
+          msgTitle.textContent = "寄语";
+          msgSection.appendChild(msgTitle);
+          addText(msgSection, "stele-msg", msg);
+          box.appendChild(msgSection);
+        }
+      }
+
+      function route() {
+        var id = "";
+        if (location.hash.length > 1) {
+          id = decodeURIComponent(location.hash.slice(1));
+        }
+        var searching = !id;
+        document.getElementById("search-view").hidden = !searching;
+        document.getElementById("detail-view").hidden = searching;
+        if (searching) renderResults();
+        else renderDetail(id);
+      }
+
+      form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        if (location.hash) location.hash = "";
+        renderResults();
+      });
+      input.addEventListener("input", renderResults);
+
+      document.getElementById("btn-back").onclick = function () {
+        location.hash = "";
+      };
+
+      window.addEventListener("hashchange", route);
+      route();
+    })();
+  </script>
+</body>
+</html>

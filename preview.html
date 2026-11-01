@@ -37,6 +37,17 @@
       </div>
     </article>
 
+    <label class="public-row">
+      <span class="public-copy">
+        <span class="public-title">公开</span>
+        <span class="public-help">默认关闭。保存后，只有打开公开的碑会出现在本机搜索里。</span>
+      </span>
+      <span class="switch">
+        <input type="checkbox" id="is-public" />
+        <span class="switch-ui" aria-hidden="true"></span>
+      </span>
+    </label>
+
     <div class="preview-actions">
       <button type="button" class="btn btn-primary" id="btn-save">保存</button>
       <button type="button" class="btn btn-primary" id="btn-copy">复制链接</button>
@@ -101,10 +112,29 @@
         EpitaphApp.copyText(url);
       };
 
-      document.getElementById("btn-save").onclick = function () {
+      var pubEl = document.getElementById("is-public");
+      pubEl.checked = data.isPublic === true;
+      pubEl.addEventListener("change", function () {
+        data.isPublic = pubEl.checked;
         EpitaphApp.save(data);
-        EpitaphApp.toast("草稿已保存到本机");
+        if (EpitaphData.hasSaved(data.shareId)) {
+          EpitaphData.saveStele(data);
+          EpitaphApp.toast(data.isPublic ? "已设为公开" : "已改为不公开");
+        }
+      });
+
+      document.getElementById("btn-save").onclick = function () {
+        data.isPublic = pubEl.checked;
+        var okDraft = EpitaphApp.save(data);
+        var okList = EpitaphData.saveStele(data);
+        if (!okDraft || !okList) {
+          EpitaphApp.toast("保存失败，请稍后再试");
+          return;
+        }
+        EpitaphApp.toast(data.isPublic ? "已保存，本机搜索可以找到" : "已保存到本机，尚未公开");
       };
+
+      EpitaphApp.mountTabbar("mine", false);
     })();
   </script>
 </body>
