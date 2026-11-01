@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-Hans-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>写下我的一生 · 数字碑</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="app app-home" id="app">
+    <header class="hero">
+      <h1>写下我的一生</h1>
+      <p class="sub">把平生写成一页可读的数字碑，留给家人</p>
+    </header>
+
+    <div class="stele-illus" aria-hidden="true">
+      <svg viewBox="0 0 120 140" xmlns="http://www.w3.org/2000/svg">
+        <path d="M30 40 Q30 18 60 14 Q90 18 90 40 L94 118 Q94 128 84 128 L36 128 Q26 128 26 118 Z"
+              fill="none" stroke="#9aa396" stroke-width="2.2"/>
+        <path d="M44 58 H76 M48 72 H72 M52 86 H68" stroke="#b0b0a4" stroke-width="2" stroke-linecap="round"/>
+        <path d="M18 48 C10 62 12 88 22 102" fill="none" stroke="#6b8a78" stroke-width="1.6" opacity="0.7"/>
+        <path d="M18 62 L8 74 M18 70 L10 82 M18 78 L12 90" fill="none" stroke="#6b8a78" stroke-width="1.4" opacity="0.65"/>
+      </svg>
+    </div>
+
+    <div class="entry-grid">
+      <button type="button" class="entry-primary" id="btn-self">
+        本人来写
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20 V9 M12 10 L7 15 M12 10 L17 15 M12 6 L9.5 10 M12 6 L14.5 10" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+      </button>
+      <button type="button" class="entry-secondary" id="btn-family">家人代写</button>
+    </div>
+
+    <div class="hint-row">
+      <span class="badge-da">大</span>
+      <span>字大 · 步骤少 · 可随时改</span>
+    </div>
+
+    <p class="center muted" style="margin-top:1.25rem;font-size:0.92rem;">
+      已预填「王德福」示例 ·
+      <button type="button" id="btn-reset" style="background:none;border:none;color:#2d523e;font:inherit;font-size:0.92rem;text-decoration:underline;cursor:pointer;padding:0;">恢复示例</button>
+    </p>
+
+    <div id="ornament"></div>
+  </div>
+
+  <script src="js/app.js"></script>
+  <script>
+    (function () {
+      var app = document.getElementById("app");
+      app.insertAdjacentHTML("afterbegin", EpitaphApp.pineCornerHtml());
+      document.getElementById("ornament").outerHTML = EpitaphApp.ornamentHtml();
+
+      var data = EpitaphApp.load();
+
+      function go(role) {
+        data.role = role;
+        EpitaphApp.save(data);
+        window.location.href = "epitaph.html";
+      }
+
+      document.getElementById("btn-self").onclick = function () { go("self"); };
+      document.getElementById("btn-family").onclick = function () { go("family"); };
+      document.getElementById("btn-reset").onclick = function () {
+        EpitaphApp.resetSample();
+        EpitaphApp.toast("已恢复示例草稿");
+      };
+    })();
+  </script>
+</body>
+</html>

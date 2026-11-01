@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-Hans-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>写墓志铭 · 数字碑</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="app" id="app">
+    <div class="topbar">
+      <div class="brand">数字碑</div>
+      <div class="steps" aria-hidden="true">
+        <span class="step-dot done"></span>
+        <span class="step-dot on"></span>
+        <span class="step-dot"></span>
+        <span class="step-dot"></span>
+        <span class="step-dot"></span>
+      </div>
+    </div>
+
+    <p class="role-badge" id="role-badge"></p>
+    <h2 class="page-title with-diamond">写墓志铭</h2>
+
+    <div class="field">
+      <label class="field-label" for="name">姓名</label>
+      <input type="text" id="name" maxlength="20" placeholder="如：王德福" autocomplete="name" />
+    </div>
+
+    <div class="field">
+      <label class="field-label">可选用模板</label>
+      <div class="templates" id="templates"></div>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="epitaph">墓志铭内容</label>
+      <div class="epitaph-box">
+        <textarea id="epitaph" maxlength="200" placeholder="一两句话就好，可随时改"></textarea>
+        <div class="char-count"><span id="count">0</span>/200</div>
+      </div>
+    </div>
+    <p class="field-tip">一两句话就好，可随时改</p>
+  </div>
+
+  <div class="footer-bar">
+    <div class="footer-inner">
+      <button type="button" class="btn btn-primary" id="btn-next">下一步：生平时间线</button>
+      <a class="btn btn-ghost" href="index.html">返回首页</a>
+    </div>
+  </div>
+
+  <script src="js/app.js"></script>
+  <script>
+    (function () {
+      var app = document.getElementById("app");
+      app.insertAdjacentHTML("afterbegin", EpitaphApp.pineCornerHtml());
+
+      var data = EpitaphApp.load();
+      var nameEl = document.getElementById("name");
+      var epiEl = document.getElementById("epitaph");
+      var countEl = document.getElementById("count");
+      var tplBox = document.getElementById("templates");
+
+      document.getElementById("role-badge").textContent = EpitaphApp.roleLabel(data.role);
+
+      function updateCount() {
+        var n = epiEl.value.length;
+        countEl.textContent = String(n);
+      }
+
+      nameEl.value = data.name || "";
+      epiEl.value = data.epitaph || "";
+      updateCount();
+
+      EpitaphApp.TEMPLATES.forEach(function (t) {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "tpl-btn" + (data.templateId === t.id ? " active" : "");
+        btn.innerHTML = '<span class="tpl-ico">·</span>';
+        var span = document.createElement("span");
+        span.textContent = t.text;
+        btn.appendChild(span);
+        btn.onclick = function () {
+          var all = tplBox.querySelectorAll(".tpl-btn");
+          for (var i = 0; i < all.length; i++) all[i].classList.remove("active");
+          btn.classList.add("active");
+          epiEl.value = t.text;
+          data.templateId = t.id;
+          data.epitaph = t.text;
+          EpitaphApp.save(data);
+          updateCount();
+        };
+        tplBox.appendChild(btn);
+      });
+
+      function persistDraft(trimNow) {
+        data.name = nameEl.value.trim();
+        var text = epiEl.value;
+        data.epitaph = trimNow ? text.trim() : text;
+        EpitaphApp.save(data);
+      }
+
+      epiEl.addEventListener("input", function () {
+        updateCount();
+        persistDraft(false);
+      });
+      epiEl.addEventListener("change", updateCount);
+      nameEl.addEventListener("input", function () { persistDraft(false); });
+
+      document.getElementById("btn-next").onclick = function () {
+        persistDraft(true);
+        epiEl.value = data.epitaph;
+        updateCount();
+        if (!data.name) {
+          EpitaphApp.toast("请填写姓名");
+          nameEl.focus();
+          return;
+        }
+        if (!data.epitaph) {
+          EpitaphApp.toast("请写一句墓志铭");
+          epiEl.focus();
+          return;
+        }
+        window.location.href = "timeline.html";
+      };
+    })();
+  </script>
+</body>
+</html>

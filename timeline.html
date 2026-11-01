@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh-Hans-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>生平时间线 · 数字碑</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="app" id="app">
+    <div class="topbar">
+      <div class="brand">数字碑</div>
+      <div class="steps" aria-hidden="true">
+        <span class="step-dot done"></span>
+        <span class="step-dot done"></span>
+        <span class="step-dot on"></span>
+        <span class="step-dot"></span>
+        <span class="step-dot"></span>
+      </div>
+    </div>
+
+    <p class="role-badge" id="role-badge"></p>
+    <h2 class="page-title with-diamond">生平时间线</h2>
+    <p class="page-desc">按年份记下重要节点，可随时改</p>
+
+    <div class="timeline-wrap">
+      <ul class="timeline-list" id="list"></ul>
+    </div>
+    <div class="empty-hint" id="empty" style="display:none;">还没有事件，请添加一段故事。</div>
+
+    <button type="button" class="add-toggle" id="btn-show-add">+ 加一段故事</button>
+
+    <div class="add-panel" id="add-panel">
+      <h3 id="panel-title">加一段故事</h3>
+      <input type="hidden" id="edit-id" value="" />
+      <div class="row-2">
+        <div class="field">
+          <label class="field-label" for="year">年份</label>
+          <input type="number" id="year" min="1800" max="2100" placeholder="如：1958" />
+        </div>
+        <div class="field">
+          <label class="field-label" for="title">标题</label>
+          <input type="text" id="title" maxlength="30" placeholder="如：成家立业" list="title-suggestions" />
+          <datalist id="title-suggestions">
+            <option value="出生于江南水乡"></option>
+            <option value="成家立业"></option>
+            <option value="孙辈绕膝"></option>
+            <option value="工作"></option>
+            <option value="退休"></option>
+          </datalist>
+        </div>
+      </div>
+      <div class="field">
+        <label class="field-label" for="note">简要说明（选填）</label>
+        <input type="text" id="note" maxlength="60" placeholder="一两句即可" />
+      </div>
+      <button type="button" class="btn btn-secondary btn-block" id="btn-add">保存这段</button>
+    </div>
+  </div>
+
+  <div class="footer-bar">
+    <div class="footer-inner">
+      <button type="button" class="btn btn-primary" id="btn-next">下一步：照片与留言</button>
+      <a class="btn btn-ghost" href="epitaph.html">上一步</a>
+    </div>
+  </div>
+
+  <script src="js/app.js"></script>
+  <script>
+    (function () {
+      var app = document.getElementById("app");
+      app.insertAdjacentHTML("afterbegin", EpitaphApp.pineCornerHtml());
+
+      var data = EpitaphApp.load();
+      var listEl = document.getElementById("list");
+      var emptyEl = document.getElementById("empty");
+      var yearEl = document.getElementById("year");
+      var titleEl = document.getElementById("title");
+      var noteEl = document.getElementById("note");
+      var editIdEl = document.getElementById("edit-id");
+      var panel = document.getElementById("add-panel");
+      var panelTitle = document.getElementById("panel-title");
+
+      document.getElementById("role-badge").textContent = EpitaphApp.roleLabel(data.role);
+
+      function openPanel(editing) {
+        panel.classList.add("open");
+        panelTitle.textContent = editing ? "改这段故事" : "加一段故事";
+      }
+
+      function closePanel() {
+        panel.classList.remove("open");
+        editIdEl.value = "";
+        yearEl.value = "";
+        titleEl.value = "";
+        noteEl.value = "";
+        panelTitle.textContent = "加一段故事";
+      }
+
+      document.getElementById("btn-show-add").onclick = function () {
+        if (panel.classList.contains("open") && !editIdEl.value) {
+          closePanel();
+        } else {
+          editIdEl.value = "";
+          yearEl.value = "";
+          titleEl.value = "";
+          noteEl.value = "";
+          openPanel(false);
+          yearEl.focus();
+        }
+      };
+
+      function render() {
+        var events = EpitaphApp.sortEvents(data.events || []);
+        data.events = events;
+        listEl.innerHTML = "";
+        emptyEl.style.display = events.length ? "none" : "block";
+        events.forEach(function (ev) {
+          var li = document.createElement("li");
+          li.className = "tl-item";
+          var main = document.createElement("div");
+          main.className = "tl-main";
+          var line = document.createElement("p");
+          line.className = "tl-line";
+          line.textContent = ev.year + "  " + (ev.title || "");
+          main.appendChild(line);
+          if (ev.note) {
+            var note = document.createElement("p");
+            note.className = "tl-note";
+            note.textContent = ev.note;
+            main.appendChild(note);
+          }
+          var actions = document.createElement("div");
+          actions.className = "tl-actions";
+          var editBtn = document.createElement("button");
+          editBtn.type = "button";
+          editBtn.className = "icon-btn";
+          editBtn.setAttribute("aria-label", "改");
+          editBtn.textContent = "改";
+          editBtn.onclick = function () {
+            editIdEl.value = ev.id;
+            yearEl.value = String(ev.year);
+            titleEl.value = ev.title || "";
+            noteEl.value = ev.note || "";
+            openPanel(true);
+            yearEl.focus();
+          };
+          var delBtn = document.createElement("button");
+          delBtn.type = "button";
+          delBtn.className = "icon-btn danger";
+          delBtn.setAttribute("aria-label", "删");
+          delBtn.textContent = "删";
+          delBtn.onclick = function () {
+            data.events = (data.events || []).filter(function (x) { return x.id !== ev.id; });
+            EpitaphApp.save(data);
+            render();
+            EpitaphApp.toast("已删除");
+          };
+          actions.appendChild(editBtn);
+          actions.appendChild(delBtn);
+          li.appendChild(main);
+          li.appendChild(actions);
+          listEl.appendChild(li);
+        });
+      }
+
+      document.getElementById("btn-add").onclick = function () {
+        var year = parseInt(yearEl.value, 10);
+        var title = titleEl.value.trim();
+        if (!year || year < 1800 || year > 2100) {
+          EpitaphApp.toast("请填写合理年份");
+          yearEl.focus();
+          return;
+        }
+        if (!title) {
+          EpitaphApp.toast("请填写标题");
+          titleEl.focus();
+          return;
+        }
+        if (!data.events) data.events = [];
+        var eid = editIdEl.value;
+        if (eid) {
+          for (var i = 0; i < data.events.length; i++) {
+            if (data.events[i].id === eid) {
+              data.events[i].year = year;
+              data.events[i].title = title;
+              data.events[i].note = noteEl.value.trim();
+              break;
+            }
+          }
+          EpitaphApp.toast("已修改");
+        } else {
+          data.events.push({
+            id: EpitaphApp.uid("e"),
+            year: year,
+            title: title,
+            note: noteEl.value.trim()
+          });
+          EpitaphApp.toast("已添加");
+        }
+        EpitaphApp.save(data);
+        closePanel();
+        render();
+      };
+
+      document.getElementById("btn-next").onclick = function () {
+        EpitaphApp.save(data);
+        window.location.href = "photos.html";
+      };
+
+      render();
+    })();
+  </script>
+</body>
+</html>

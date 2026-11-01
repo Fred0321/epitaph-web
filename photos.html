@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-Hans-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>照片与留言 · 数字碑</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="app" id="app">
+    <div class="topbar">
+      <div class="brand">数字碑</div>
+      <div class="steps" aria-hidden="true">
+        <span class="step-dot done"></span>
+        <span class="step-dot done"></span>
+        <span class="step-dot done"></span>
+        <span class="step-dot on"></span>
+        <span class="step-dot"></span>
+      </div>
+    </div>
+
+    <p class="role-badge" id="role-badge"></p>
+    <h2 class="page-title">照片与留言</h2>
+
+    <div class="photo-section">
+      <p class="sec-label">点此添加照片</p>
+      <div class="photo-grid" id="photos" aria-label="照片占位"></div>
+      <p class="center muted" style="margin:0;">照片可后补</p>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="message">留给后人的话</label>
+      <div class="msg-box">
+        <textarea id="message" maxlength="300" placeholder="愿你们平安喜乐，吾心足矣"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-bar">
+    <div class="footer-inner">
+      <button type="button" class="btn btn-primary" id="btn-next">下一步：预览碑页</button>
+      <a class="btn btn-ghost" href="timeline.html">上一步</a>
+    </div>
+  </div>
+
+  <script src="js/app.js"></script>
+  <script>
+    (function () {
+      var app = document.getElementById("app");
+      app.insertAdjacentHTML("afterbegin", EpitaphApp.pineCornerHtml());
+
+      var data = EpitaphApp.load();
+      var msgEl = document.getElementById("message");
+      var grid = document.getElementById("photos");
+
+      document.getElementById("role-badge").textContent = EpitaphApp.roleLabel(data.role);
+
+      var n = data.photoSlots || 2;
+      for (var i = 0; i < n; i++) {
+        var slot = document.createElement("div");
+        slot.className = "photo-slot";
+        slot.innerHTML = '<span class="plus">＋</span>照片';
+        slot.title = "演示占位，暂不上传";
+        slot.onclick = function () {
+          EpitaphApp.toast("演示版暂不上传，照片可后补");
+        };
+        grid.appendChild(slot);
+      }
+
+      msgEl.value = data.familyMessage || "";
+
+      function persist() {
+        data.familyMessage = msgEl.value.trim();
+        EpitaphApp.save(data);
+      }
+
+      msgEl.addEventListener("input", function () {
+        data.familyMessage = msgEl.value;
+        EpitaphApp.save(data);
+      });
+
+      document.getElementById("btn-next").onclick = function () {
+        persist();
+        window.location.href = "preview.html";
+      };
+    })();
+  </script>
+</body>
+</html>
