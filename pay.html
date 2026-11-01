@@ -7,7 +7,7 @@
   <meta http-equiv="Expires" content="0" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>保存上网 · 数字碑</title>
-  <link rel="stylesheet" href="css/styles.css?v=20261101i" />
+  <link rel="stylesheet" href="css/styles.css?v=20261101j" />
 </head>
 <body>
   <div class="app app-pay" id="app">
@@ -56,10 +56,11 @@
     </section>
   </div>
 
-  <script src="js/config.js?v=20261101i"></script>
-  <script src="js/app.js?v=20261101i"></script>
+  <script src="js/config.js?v=20261101j"></script>
+  <script src="js/app.js?v=20261101j"></script>
   <script>
     (function () {
+      if (!EpitaphAuth.require("pay.html")) return;
       var data = EpitaphApp.load();
       if (!data.shareId) data.shareId = "demo-" + EpitaphApp.uid("s").slice(-8);
       if (EpitaphData.isPaid(data)) data.paid = true;

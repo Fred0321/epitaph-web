@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-Hans-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>登录数字碑</title>
+  <link rel="stylesheet" href="css/styles.css?v=20261101j" />
+</head>
+<body>
+  <div class="app app-login" id="app">
+    <p class="demo-banner">演示：不会真发短信</p>
+    <header class="search-hero">
+      <h1 class="search-title">登录数字碑</h1>
+      <div class="search-pine" id="login-pine" aria-hidden="true"></div>
+    </header>
+    <p class="page-desc">登录后才能写碑、看族谱</p>
+
+    <form id="login-form">
+      <div class="field">
+        <label class="field-label" for="phone">手机号</label>
+        <input type="tel" id="phone" inputmode="numeric" maxlength="11" placeholder="请输入手机号" autocomplete="tel" />
+      </div>
+      <div class="field">
+        <label class="field-label" for="code">短信码</label>
+        <div class="code-row">
+          <input type="text" id="code" inputmode="numeric" maxlength="6" placeholder="6位短信码" autocomplete="one-time-code" />
+          <button type="button" class="btn btn-secondary" id="btn-code">获取短信码</button>
+        </div>
+      </div>
+      <p class="demo-code" id="demo-code">演示验证码 <strong>123456</strong></p>
+      <button type="submit" class="btn btn-primary">登录</button>
+    </form>
+
+    <p class="center" style="margin-top:1.1rem;">
+      <button type="button" class="text-btn" id="btn-register">还没有账号？去注册</button>
+    </p>
+    <p class="search-scope-note">我们不会把你的手机号公开</p>
+  </div>
+
+  <script src="js/config.js?v=20261101j"></script>
+  <script src="js/app.js?v=20261101j"></script>
+  <script>
+    (function () {
+      document.getElementById("login-pine").innerHTML = EpitaphApp.PINE_SVG;
+      EpitaphApp.mountTabbar("mine", false);
+
+      var phoneEl = document.getElementById("phone");
+      var codeEl = document.getElementById("code");
+      var codeBtn = document.getElementById("btn-code");
+      var timer = null;
+
+      function safeFrom() {
+        var from = "family.html";
+        var query = location.search.replace(/^\?/, "");
+        var parts = query ? query.split("&") : [];
+        for (var i = 0; i < parts.length; i++) {
+          if (parts[i].indexOf("from=") === 0) from = decodeURIComponent(parts[i].slice(5));
+        }
+        if (!/^(index|epitaph|timeline|photos|preview|pay|search|family)\.html$/.test(from)) from = "family.html";
+        return from;
+      }
+
+      if (EpitaphAuth.isLoggedIn()) {
+        window.location.replace(safeFrom());
+        return;
+      }
+
+      codeBtn.onclick = function () {
+        var phone = phoneEl.value.replace(/\D/g, "");
+        phoneEl.value = phone;
+        if (!/^1\d{10}$/.test(phone)) {
+          EpitaphApp.toast("请输入11位手机号");
+          phoneEl.focus();
+          return;
+        }
+        EpitaphApp.toast("演示验证码是 123456");
+        codeBtn.disabled = true;
+        var left = 60;
+        codeBtn.textContent = left + "秒后再试";
+        clearInterval(timer);
+        timer = setInterval(function () {
+          left -= 1;
+          if (left <= 0) {
+            clearInterval(timer);
+            codeBtn.disabled = false;
+            codeBtn.textContent = "获取短信码";
+            return;
+          }
+          codeBtn.textContent = left + "秒后再试";
+        }, 1000);
+      };
+
+      document.getElementById("btn-register").onclick = function () {
+        EpitaphApp.toast("演示版不用注册，验证码 123456");
+      };
+
+      document.getElementById("login-form").onsubmit = function (event) {
+        event.preventDefault();
+        EpitaphAuth.loginDemo(phoneEl.value, codeEl.value, function (err) {
+          if (err && err.message === "phone") {
+            EpitaphApp.toast("请输入11位手机号");
+            phoneEl.focus();
+            return;
+          }
+          if (err) {
+            EpitaphApp.toast("验证码不对，演示请填 123456");
+            codeEl.focus();
+            return;
+          }
+          window.location.href = safeFrom();
+        });
+      };
+    })();
+  </script>
+</body>
+</html>

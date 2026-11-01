@@ -7,7 +7,7 @@
   <meta http-equiv="Expires" content="0" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>写墓志铭 · 数字碑</title>
-  <link rel="stylesheet" href="css/styles.css?v=20261101i" />
+  <link rel="stylesheet" href="css/styles.css?v=20261101j" />
 </head>
 <body>
   <div class="app" id="app">
@@ -52,10 +52,11 @@
     </div>
   </div>
 
-  <script src="js/config.js?v=20261101i"></script>
-  <script src="js/app.js?v=20261101i"></script>
+  <script src="js/config.js?v=20261101j"></script>
+  <script src="js/app.js?v=20261101j"></script>
   <script>
     (function () {
+      if (!EpitaphAuth.require("epitaph.html")) return;
       var app = document.getElementById("app");
       app.insertAdjacentHTML("afterbegin", EpitaphApp.pineCornerHtml());
 

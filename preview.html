@@ -7,7 +7,7 @@
   <meta http-equiv="Expires" content="0" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>预览碑页 · 数字碑</title>
-  <link rel="stylesheet" href="css/styles.css?v=20261101i" />
+  <link rel="stylesheet" href="css/styles.css?v=20261101j" />
 </head>
 <body>
   <div class="app" id="app">
@@ -65,11 +65,17 @@
       <input type="text" id="share-url" readonly aria-label="分享链接（示意）" />
     </div>
 
-    <div id="ornament"></div>
+      <button type="button" class="btn btn-ghost" id="btn-logout" hidden>退出登录</button>
+      <div class="card" id="login-gate" hidden>
+        <p>登录后才能改自己的碑、编族谱。</p>
+        <a class="btn btn-primary" href="login.html?from=preview.html">去登录</a>
+      </div>
+
+      <div id="ornament"></div>
   </div>
 
-  <script src="js/config.js?v=20261101i"></script>
-  <script src="js/app.js?v=20261101i"></script>
+  <script src="js/config.js?v=20261101j"></script>
+  <script src="js/app.js?v=20261101j"></script>
   <script>
     (function () {
       var app = document.getElementById("app");
@@ -194,9 +200,28 @@
       });
 
       document.getElementById("btn-new").onclick = function () {
+        if (!EpitaphAuth.require("epitaph.html")) return;
         EpitaphApp.startNewStele(data.role || "self");
         window.location.href = "epitaph.html";
       };
+
+      var logoutBtn = document.getElementById("btn-logout");
+      if (!EpitaphAuth.isLoggedIn()) {
+        var gate = document.getElementById("login-gate");
+        var actions = document.querySelector(".preview-actions");
+        var pub = document.querySelector(".public-row");
+        if (gate) gate.hidden = false;
+        if (actions) actions.hidden = true;
+        if (pub) pub.hidden = true;
+      } else if (logoutBtn) {
+        logoutBtn.hidden = false;
+        var who = EpitaphAuth.current();
+        logoutBtn.textContent = "退出登录" + (who && who.phone ? "（" + who.phone + "）" : "");
+        logoutBtn.onclick = function () {
+          EpitaphAuth.logout();
+          window.location.reload();
+        };
+      }
 
       EpitaphApp.mountTabbar("mine", false);
     })();

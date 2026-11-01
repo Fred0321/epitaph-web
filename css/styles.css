@@ -1129,11 +1129,11 @@ select:focus {
   align-items: center;
   justify-content: center;
   gap: 0.05rem;
-  min-height: 68px;
+  min-height: 64px;
   color: var(--ink-soft);
-  font-size: 1.02rem;
+  font-size: 0.92rem;
   font-weight: 600;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.04em;
   text-decoration: none;
 }
 
@@ -1324,3 +1324,113 @@ body.has-actionbar .toast { bottom: 13.5rem; }
   font-family: var(--serif);
   letter-spacing: 0.06em;
 }
+
+.code-row {
+  display: flex;
+  gap: 0.55rem;
+  align-items: stretch;
+}
+
+.code-row input { flex: 1; min-width: 0; }
+
+.code-row .btn {
+  width: auto;
+  flex: 0 0 8.2rem;
+  min-height: 62px;
+  padding: 0.4rem 0.6rem;
+  font-size: 1rem;
+}
+
+.demo-code {
+  text-align: center;
+  font-size: 1.15rem;
+  color: var(--pine-deep);
+  margin: 0.2rem 0 0.9rem;
+}
+
+.text-btn {
+  background: none;
+  border: none;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 1.05rem;
+  cursor: pointer;
+  padding: 0.4rem;
+}
+
+.tree-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  margin: 0 -0.2rem 1rem;
+  padding-bottom: 0.4rem;
+}
+
+.tree-board {
+  min-width: 520px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+
+.tree-row {
+  display: flex;
+  justify-content: center;
+  gap: 0.7rem;
+  flex-wrap: nowrap;
+}
+
+.tree-stem {
+  width: 2px;
+  height: 22px;
+  background: var(--pine-soft);
+  margin: 0 auto;
+}
+
+.tree-card {
+  width: 9.2rem;
+  min-height: 6.4rem;
+  background: #fff;
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  padding: 0.75rem 0.55rem 0.65rem;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+
+.tree-card h3 {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 1.2rem;
+  letter-spacing: 0.04em;
+}
+
+.tree-card p { margin: 0.2rem 0 0; font-size: 0.98rem; }
+
+.tree-card.is-self {
+  border: 2px solid var(--pine);
+}
+
+.tree-tag { color: var(--ink-soft); }
+
+.tree-link {
+  margin-top: 0.35rem;
+  background: none;
+  border: none;
+  color: var(--pine);
+  font: inherit;
+  font-size: 0.95rem;
+  text-decoration: underline;
+  cursor: pointer;
+  min-height: 36px;
+}
+
+#tree-wrap[hidden],
+#login-gate[hidden],
+#add-panel[hidden] { display: none !important; }
+
+#add-panel { display: none; }
+#add-panel.open { display: block; }
+
+[hidden] { display: none !important; }

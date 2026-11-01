@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-Hans-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>我家族谱 · 数字碑</title>
+  <link rel="stylesheet" href="css/styles.css?v=20261101j" />
+</head>
+<body>
+  <div class="app app-family" id="app">
+    <header class="search-hero">
+      <h1 class="search-title">我家族谱</h1>
+      <div class="search-pine" id="family-pine" aria-hidden="true"></div>
+    </header>
+    <p class="page-desc" id="branch">王德福这一支</p>
+
+    <div id="tree-wrap">
+      <div class="tree-scroll" id="tree-scroll">
+        <div class="tree-board" id="tree-board"></div>
+      </div>
+      <button type="button" class="btn btn-secondary" id="btn-add">添加亲人</button>
+      <label class="public-row" id="public-row">
+        <span class="public-copy">
+          <span class="public-title">公开族谱</span>
+          <span class="public-help">默认只有自己能看。打开后，别人也能看这支族谱。</span>
+        </span>
+        <span class="switch">
+          <input type="checkbox" id="tree-public" />
+          <span class="switch-ui" aria-hidden="true"></span>
+        </span>
+      </label>
+    </div>
+
+    <div class="card" id="login-gate" hidden>
+      <p>登录后才能看完整族谱、添加亲人。</p>
+      <a class="btn btn-primary" href="login.html?from=family.html">去登录</a>
+    </div>
+
+    <form class="add-panel" id="add-panel">
+      <h3>添加亲人</h3>
+      <div class="field">
+        <label class="field-label" for="rel-role">关系</label>
+        <select id="rel-role">
+          <option value="parent">父母</option>
+          <option value="spouse">配偶</option>
+          <option value="sibling">兄弟姐妹</option>
+          <option value="child">子女</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="field-label" for="rel-name">姓名</label>
+        <input type="text" id="rel-name" maxlength="20" placeholder="如：王强" />
+      </div>
+      <div class="row-2">
+        <div class="field">
+          <label class="field-label" for="rel-birth">出生年</label>
+          <input type="text" id="rel-birth" inputmode="numeric" maxlength="4" placeholder="可留空" />
+        </div>
+        <div class="field">
+          <label class="field-label" for="rel-death">去世年</label>
+          <input type="text" id="rel-death" inputmode="numeric" maxlength="4" placeholder="可留空" />
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary">保存这位亲人</button>
+      <button type="button" class="btn btn-ghost" id="btn-cancel-add">取消</button>
+    </form>
+
+    <p class="search-scope-note">只有家人登录后才能看完整族谱</p>
+  </div>
+
+  <script src="js/config.js?v=20261101j"></script>
+  <script src="js/app.js?v=20261101j"></script>
+  <script>
+    (function () {
+      document.getElementById("family-pine").innerHTML = EpitaphApp.PINE_SVG;
+      EpitaphApp.mountTabbar("clan", false);
+
+      var tree = EpitaphFamily.load();
+      var board = document.getElementById("tree-board");
+      var panel = document.getElementById("add-panel");
+      var loggedIn = EpitaphAuth.isLoggedIn();
+
+      function yearText(node) {
+        if (!node) return "";
+        var b = node.birthYear ? String(node.birthYear) : "";
+        var d = node.deathYear ? String(node.deathYear) : "";
+        if (b && d) return b + "-" + d;
+        if (b) return b + "-";
+        return "";
+      }
+
+      function openStele(node) {
+        var year = node.birthYear ? String(node.birthYear) : "";
+        EpitaphData.search({ name: node.name, year: year }, function (err, cards) {
+          var hit = null;
+          var list = cards || [];
+          for (var i = 0; i < list.length; i++) {
+            if (list[i].name === node.name) { hit = list[i]; break; }
+          }
+          if (!hit) {
+            EpitaphApp.toast("还没有这座公开的碑");
+            return;
+          }
+          window.location.href = "search.html#" + encodeURIComponent(hit.id);
+        });
+      }
+
+      function makeCard(node, kind) {
+        var card = document.createElement("article");
+        card.className = "tree-card" + (kind === "self" ? " is-self" : "");
+        var name = document.createElement("h3");
+        name.textContent = node.name || "未填姓名";
+        card.appendChild(name);
+        var years = yearText(node);
+        if (years) {
+          var line = document.createElement("p");
+          line.textContent = years;
+          card.appendChild(line);
+        }
+        if (kind === "self") {
+          var tag = document.createElement("p");
+          tag.className = "tree-tag";
+          tag.textContent = "本人";
+          card.appendChild(tag);
+        }
+        if (node.name) {
+          var link = document.createElement("button");
+          link.type = "button";
+          link.className = "tree-link";
+          link.textContent = "查看碑";
+          link.onclick = function () { openStele(node); };
+          card.appendChild(link);
+        }
+        return card;
+      }
+
+      function row(nodes, kind) {
+        var wrap = document.createElement("div");
+        wrap.className = "tree-row";
+        for (var i = 0; i < nodes.length; i++) wrap.appendChild(makeCard(nodes[i], kind));
+        return wrap;
+      }
+
+      function render() {
+        board.innerHTML = "";
+        document.getElementById("branch").textContent = tree.title || ((tree.self && tree.self.name) ? tree.self.name + "这一支" : "我家族谱");
+        var parents = tree.parents || [];
+        if (parents.length) {
+          board.appendChild(row(parents, "parent"));
+          var line = document.createElement("div");
+          line.className = "tree-stem";
+          board.appendChild(line);
+        }
+        var mid = [];
+        if (tree.spouse && tree.spouse.name) mid.push({ node: tree.spouse, kind: "spouse" });
+        if (tree.self) mid.push({ node: tree.self, kind: "self" });
+        (tree.siblings || []).forEach(function (item) { mid.push({ node: item, kind: "sibling" }); });
+        var midRow = document.createElement("div");
+        midRow.className = "tree-row";
+        mid.forEach(function (item) { midRow.appendChild(makeCard(item.node, item.kind)); });
+        board.appendChild(midRow);
+        var kids = tree.children || [];
+        if (kids.length) {
+          var stem = document.createElement("div");
+          stem.className = "tree-stem";
+          board.appendChild(stem);
+          board.appendChild(row(kids, "child"));
+        }
+        document.getElementById("tree-public").checked = tree.isPublic === true;
+      }
+
+      function persist() {
+        if (tree.self && tree.self.name) tree.title = tree.self.name + "这一支";
+        EpitaphFamily.save(tree, function (err, saved, message) {
+          if (saved) tree = saved;
+          if (message) EpitaphApp.toast(message);
+        });
+        render();
+      }
+
+      if (!loggedIn) {
+        document.getElementById("tree-wrap").hidden = true;
+        document.getElementById("add-panel").hidden = true;
+        document.getElementById("login-gate").hidden = false;
+        EpitaphApp.mountTabbar("clan", false);
+        return;
+      }
+
+      document.getElementById("btn-add").onclick = function () {
+        panel.classList.add("open");
+        document.getElementById("rel-name").focus();
+      };
+      document.getElementById("btn-cancel-add").onclick = function () {
+        panel.classList.remove("open");
+      };
+      document.getElementById("tree-public").addEventListener("change", function () {
+        tree.isPublic = document.getElementById("tree-public").checked === true;
+        persist();
+      });
+      document.getElementById("add-panel").onsubmit = function (event) {
+        event.preventDefault();
+        var name = document.getElementById("rel-name").value.replace(/\s+/g, "");
+        if (!name) {
+          EpitaphApp.toast("请填写姓名");
+          return;
+        }
+        var birthText = document.getElementById("rel-birth").value.replace(/\D/g, "");
+        var deathText = document.getElementById("rel-death").value.replace(/\D/g, "");
+        var person = {
+          name: name,
+          birthYear: birthText ? parseInt(birthText, 10) : null,
+          deathYear: deathText ? parseInt(deathText, 10) : null
+        };
+        var role = document.getElementById("rel-role").value;
+        if (role === "parent") {
+          tree.parents = tree.parents || [];
+          if (tree.parents.length >= 2) {
+            EpitaphApp.toast("父母最多两位");
+            return;
+          }
+          tree.parents.push(person);
+        } else if (role === "spouse") {
+          tree.spouse = person;
+        } else if (role === "sibling") {
+          tree.siblings = tree.siblings || [];
+          tree.siblings.push(person);
+        } else {
+          tree.children = tree.children || [];
+          tree.children.push(person);
+        }
+        document.getElementById("rel-name").value = "";
+        document.getElementById("rel-birth").value = "";
+        document.getElementById("rel-death").value = "";
+        panel.classList.remove("open");
+        persist();
+        EpitaphApp.toast("已添加");
+      };
+
+      render();
+    })();
+  </script>
+</body>
+</html>

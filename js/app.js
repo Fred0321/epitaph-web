@@ -375,6 +375,7 @@
       { id: "home", href: "index.html", label: "首页" },
       { id: "write", href: "epitaph.html", label: "写碑" },
       { id: "search", href: "search.html", label: "搜索" },
+      { id: "clan", href: "family.html", label: "族谱" },
       { id: "mine", href: "preview.html", label: "我的" }
     ];
     var html = '<nav class="tabbar" aria-label="底部导航">';
@@ -964,5 +965,167 @@
     }
   };
   global.EpitaphPay = EpitaphPay;
+
+  var LOGIN_KEY = "epitaph_web_login_v1";
+  var FAMILY_KEY = "epitaph_web_family_v1";
+  var DEMO_CODE = "123456";
+
+  function readLogin() {
+    try {
+      var raw = localStorage.getItem(LOGIN_KEY);
+      if (!raw) return null;
+      var data = JSON.parse(raw);
+      if (!data || data.loggedIn !== true || !data.phone) return null;
+      return data;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function sampleFamily() {
+    return {
+      title: "王德福这一支",
+      isPublic: false,
+      cloudId: null,
+      self: { name: "王德福", birthYear: 1958, deathYear: 2024 },
+      parents: [{ name: "王守仁", birthYear: 1931, deathYear: 2001 }],
+      spouse: null,
+      siblings: [{ name: "王德明", birthYear: 1960, deathYear: null }],
+      children: [
+        { name: "王强", birthYear: null, deathYear: null },
+        { name: "王丽", birthYear: null, deathYear: null },
+        { name: "王芳", birthYear: null, deathYear: null }
+      ]
+    };
+  }
+
+  function linkPhoneToCloud(phone, callback) {
+    ensureSession(function (err) {
+      if (err) {
+        if (callback) callback(null);
+        return;
+      }
+      var client = getCloud();
+      if (!client || !client.auth || typeof client.auth.updateUser !== "function") {
+        if (callback) callback(null);
+        return;
+      }
+      client.auth.updateUser({ data: { phone: phone } }).then(function () {
+        if (callback) callback(null);
+      }).catch(function () {
+        if (callback) callback(null);
+      });
+    });
+  }
+
+  var EpitaphAuth = {
+    DEMO_CODE: DEMO_CODE,
+    isLoggedIn: function () {
+      return !!readLogin();
+    },
+    current: function () {
+      return readLogin();
+    },
+    loginDemo: function (phone, code, callback) {
+      var digits = String(phone || "").replace(/\D/g, "");
+      if (!/^1\d{10}$/.test(digits)) {
+        callback(new Error("phone"));
+        return;
+      }
+      if (String(code || "").trim() !== DEMO_CODE) {
+        callback(new Error("code"));
+        return;
+      }
+      var session = { phone: digits, loggedIn: true, demo: true, at: Date.now() };
+      try {
+        localStorage.setItem(LOGIN_KEY, JSON.stringify(session));
+      } catch (e) {
+        callback(e);
+        return;
+      }
+      linkPhoneToCloud(digits, function () {
+        callback(null, session);
+      });
+    },
+    logout: function () {
+      try { localStorage.removeItem(LOGIN_KEY); } catch (e) { /* ignore */ }
+    },
+    require: function (from) {
+      if (readLogin()) return true;
+      var target = from || "index.html";
+      window.location.href = "login.html?from=" + encodeURIComponent(target);
+      return false;
+    }
+  };
+
+  function readFamily() {
+    try {
+      var raw = localStorage.getItem(FAMILY_KEY);
+      if (!raw) return null;
+      var data = JSON.parse(raw);
+      if (!data || !data.self) return null;
+      return data;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function upsertFamilyCloud(tree, callback) {
+    ensureSession(function (err) {
+      if (err) {
+        callback(err, tree, "暂时只保存在本机。");
+        return;
+      }
+      var client = getCloud();
+      if (!client) {
+        callback(new Error("no-cloud"), tree, "暂时只保存在本机。");
+        return;
+      }
+      var row = {
+        title: tree.title || "",
+        is_public: tree.isPublic === true,
+        tree: {
+          self: tree.self,
+          parents: tree.parents || [],
+          spouse: tree.spouse || null,
+          siblings: tree.siblings || [],
+          children: tree.children || []
+        }
+      };
+      var query = isUuid(tree.cloudId)
+        ? client.from("family_trees").update(row).eq("id", tree.cloudId).select("id").single()
+        : client.from("family_trees").insert(row).select("id").single();
+      query.then(function (res) {
+        if (res.error) {
+          callback(res.error, tree, "族谱云端表还没建好，已保存在本机。请运行 supabase/schema_family.sql。");
+          return;
+        }
+        if (res.data && res.data.id) tree.cloudId = res.data.id;
+        try { localStorage.setItem(FAMILY_KEY, JSON.stringify(tree)); } catch (e) { /* ignore */ }
+        callback(null, tree, "");
+      }).catch(function () {
+        callback(new Error("network"), tree, "暂时只保存在本机。");
+      });
+    });
+  }
+
+  var EpitaphFamily = {
+    sample: sampleFamily,
+    load: function () {
+      return readFamily() || sampleFamily();
+    },
+    save: function (tree, callback) {
+      try {
+        localStorage.setItem(FAMILY_KEY, JSON.stringify(tree));
+      } catch (e) {
+        if (callback) callback(e, tree, "本机保存失败");
+        return;
+      }
+      upsertFamilyCloud(tree, callback || function () {});
+    }
+  };
+
+  global.EpitaphAuth = EpitaphAuth;
+  global.EpitaphFamily = EpitaphFamily;
   loadSupabaseLater();
 })(window);

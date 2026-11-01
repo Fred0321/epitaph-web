@@ -7,7 +7,7 @@
   <meta http-equiv="Expires" content="0" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>写下我的一生 · 数字碑</title>
-  <link rel="stylesheet" href="css/styles.css?v=20261101i" />
+  <link rel="stylesheet" href="css/styles.css?v=20261101j" />
 </head>
 <body>
   <div class="app app-home" id="app">
@@ -49,8 +49,8 @@
     <div id="ornament"></div>
   </div>
 
-  <script src="js/config.js?v=20261101i"></script>
-  <script src="js/app.js?v=20261101i"></script>
+  <script src="js/config.js?v=20261101j"></script>
+  <script src="js/app.js?v=20261101j"></script>
   <script>
     (function () {
       var app = document.getElementById("app");
@@ -66,12 +66,18 @@
         window.location.href = "epitaph.html";
       }
 
+      function enterWrite(next) {
+        if (!EpitaphAuth.require("epitaph.html")) return;
+        next();
+      }
       document.getElementById("btn-new").onclick = function () {
-        EpitaphApp.startNewStele("self");
-        window.location.href = "epitaph.html";
+        enterWrite(function () {
+          EpitaphApp.startNewStele("self");
+          window.location.href = "epitaph.html";
+        });
       };
-      document.getElementById("btn-self").onclick = function () { go("self"); };
-      document.getElementById("btn-family").onclick = function () { go("family"); };
+      document.getElementById("btn-self").onclick = function () { enterWrite(function () { go("self"); }); };
+      document.getElementById("btn-family").onclick = function () { enterWrite(function () { go("family"); }); };
       document.getElementById("btn-reset").onclick = function () {
         EpitaphApp.resetSample();
         EpitaphApp.toast("已恢复示例，这笔草稿尚未付费");
