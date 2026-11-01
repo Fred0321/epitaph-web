@@ -341,6 +341,7 @@
       events: (raw && raw.events) || [],
       familyMessage: (raw && raw.familyMessage) || "",
       isPublic: !!(raw && raw.isPublic === true),
+      paid: (source === "sample") || (raw && raw.source === "sample") || !!(raw && raw.paid === true),
       source: (raw && raw.source) || source || "local"
     };
   }
@@ -355,7 +356,7 @@
     var seen = {};
     var out = [];
     saved.concat(samples).forEach(function (rec) {
-      if (!rec.id || seen[rec.id] || rec.isPublic !== true) return;
+      if (!rec.id || seen[rec.id] || rec.isPublic !== true || rec.paid !== true) return;
       seen[rec.id] = true;
       out.push(rec);
     });
@@ -388,7 +389,7 @@
   /**
    * 搜索与读取的唯一入口。返回的卡片只有姓名、年份、墓志铭一行。
    * 姓名为包含匹配，年份须与生年或卒年完全相同。两个都填则同时满足。
-   * 不按籍贯过滤，也不把籍贯放进卡片。未公开的碑不会离开这一层。
+   * 不按籍贯过滤，也不把籍贯放进卡片。未公开或未付费的碑不会离开这一层。
    */
   var EpitaphData = {
     formatYears: formatYears,
@@ -417,11 +418,43 @@
         return item && item.id === id;
       });
     },
+    isPaid: function (draft) {
+      if (draft && draft.paid === true) return true;
+      var id = draft && (draft.shareId || draft.id);
+      if (!id) return false;
+      var list = LocalAdapter.readSaved();
+      for (var i = 0; i < list.length; i++) {
+        if (list[i] && list[i].id === id && list[i].paid === true) return true;
+      }
+      return false;
+    },
+    describeDraft: function (draft) {
+      var stele = asStele(draft || {}, "local");
+      return {
+        name: stele.name,
+        years: formatYears(stele),
+        epitaph: stele.epitaph
+      };
+    },
+    /**
+     * 记下已模拟支付。不自动公开。
+     * 真实微信支付 / 支付宝接入后，仍由这里写入 paid。
+     */
+    markPaid: function (draft, receipt) {
+      var data = draft || {};
+      data.paid = true;
+      data.payMethod = (receipt && receipt.method) || "";
+      data.paidAt = Date.now();
+      var okDraft = save(data);
+      var okList = EpitaphData.saveStele(data);
+      return okDraft && okList;
+    },
     saveStele: function (draft) {
       try {
         var data = draft || {};
         if (!data.shareId) data.shareId = uid("stele");
         var years = deriveYears(data);
+        var paid = data.paid === true;
         var rec = {
           id: data.shareId,
           name: data.name || "",
@@ -432,7 +465,10 @@
           events: clone(data.events || []),
           familyMessage: data.familyMessage || "",
           role: data.role || "self",
-          isPublic: data.isPublic === true,
+          isPublic: data.isPublic === true && paid,
+          paid: paid,
+          payMethod: paid ? (data.payMethod || "") : "",
+          paidAt: paid ? (data.paidAt || null) : null,
           source: "local",
           savedAt: Date.now()
         };
@@ -467,4 +503,28 @@
     PINE_SVG: PINE_SVG
   };
   global.EpitaphData = EpitaphData;
+
+  /**
+   * 支付桩。现在只模拟成功，不访问网络、不扣款。
+   * 换成微信支付 / 支付宝时，只替换 EpitaphPay.pay，页面不用改。
+   */
+  var EpitaphPay = {
+    price: 3,
+    pay: function (method, callback) {
+      var allowed = method === "wechat" || method === "alipay";
+      if (typeof callback !== "function") return;
+      if (!allowed) {
+        callback(new Error("unsupported-method"));
+        return;
+      }
+      callback(null, {
+        ok: true,
+        simulated: true,
+        method: method,
+        amount: 3,
+        provider: "stub"
+      });
+    }
+  };
+  global.EpitaphPay = EpitaphPay;
 })(window);

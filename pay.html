@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-Hans-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>保存上网 · 数字碑</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="app app-pay" id="app">
+    <p class="demo-banner" role="status">预览演示，不会真扣钱</p>
+
+    <section id="pay-view">
+      <header class="search-hero">
+        <h1 class="search-title">保存上网</h1>
+        <div class="search-pine" id="pay-pine" aria-hidden="true"></div>
+      </header>
+
+      <article class="pay-card" id="pay-card" aria-label="将要保存的碑"></article>
+
+      <p class="pay-price">一次性 ¥3</p>
+      <p class="pay-buys">一次付费，把这座碑保存到网站上，可设为公开被家人搜到</p>
+      <ul class="pay-benefits">
+        <li>永久保存在网站上</li>
+        <li>家人换手机也能看</li>
+        <li>可设为公开，供人搜到</li>
+      </ul>
+
+      <div class="pay-methods" role="radiogroup" aria-label="付款方式，仅作演示">
+        <button type="button" class="pay-method selected" data-method="wechat" role="radio" aria-checked="true">
+          <span>微信支付</span>
+          <span class="pay-mark" aria-hidden="true"></span>
+        </button>
+        <button type="button" class="pay-method" data-method="alipay" role="radio" aria-checked="false">
+          <span>支付宝</span>
+          <span class="pay-mark" aria-hidden="true"></span>
+        </button>
+      </div>
+
+      <button type="button" class="btn btn-primary" id="btn-pay">模拟支付 ¥3</button>
+      <button type="button" class="btn btn-secondary" id="btn-local">不付费，只存在本机</button>
+      <button type="button" class="btn btn-ghost" id="btn-cancel">取消</button>
+      <p class="pay-note">付款后可随时修改碑文，不再收费</p>
+    </section>
+
+    <section id="success-view" hidden>
+      <h1 class="search-title">支付成功</h1>
+      <p class="pay-buys">这座碑已保存。回到预览后，就可以打开「公开」。</p>
+      <p class="pay-note">这是模拟支付，没有扣款。</p>
+      <button type="button" class="btn btn-primary" id="btn-back-preview">返回预览</button>
+    </section>
+  </div>
+
+  <script src="js/app.js"></script>
+  <script>
+    (function () {
+      var data = EpitaphApp.load();
+      if (!data.shareId) data.shareId = "demo-" + EpitaphApp.uid("s").slice(-8);
+      if (EpitaphData.isPaid(data)) data.paid = true;
+
+      var method = "wechat";
+      document.getElementById("pay-pine").innerHTML = EpitaphApp.PINE_SVG;
+      EpitaphApp.mountTabbar("mine", false);
+
+      function safeReturn() {
+        var from = "preview.html";
+        var query = location.search.replace(/^\?/, "");
+        if (query) {
+          var parts = query.split("&");
+          for (var i = 0; i < parts.length; i++) {
+            if (parts[i].indexOf("from=") === 0) {
+              from = decodeURIComponent(parts[i].slice(5));
+            }
+          }
+        }
+        if (!/^(index|epitaph|timeline|photos|preview|search)\.html$/.test(from)) {
+          from = "preview.html";
+        }
+        return from;
+      }
+
+      var summary = EpitaphData.describeDraft(data);
+      var card = document.getElementById("pay-card");
+      var nameEl = document.createElement("h2");
+      nameEl.className = "pay-card-name";
+      nameEl.textContent = (summary.name || "（未填姓名）") + (summary.years ? " " + summary.years : "");
+      var lineEl = document.createElement("p");
+      lineEl.className = "pay-card-line";
+      lineEl.textContent = summary.epitaph || "（无墓志铭）";
+      card.appendChild(nameEl);
+      card.appendChild(lineEl);
+
+      var methods = document.querySelectorAll(".pay-method");
+      for (var i = 0; i < methods.length; i++) {
+        methods[i].onclick = function () {
+          method = this.getAttribute("data-method");
+          for (var j = 0; j < methods.length; j++) {
+            var on = methods[j] === this;
+            methods[j].classList.toggle("selected", on);
+            methods[j].setAttribute("aria-checked", on ? "true" : "false");
+          }
+        };
+      }
+
+      document.getElementById("btn-pay").onclick = function () {
+        EpitaphPay.pay(method, function (err, receipt) {
+          if (err || !receipt || receipt.ok !== true || receipt.simulated !== true) {
+            EpitaphApp.toast("模拟支付没有完成");
+            return;
+          }
+          if (!EpitaphData.markPaid(data, receipt)) {
+            EpitaphApp.toast("保存失败，请稍后再试");
+            return;
+          }
+          document.getElementById("pay-view").hidden = true;
+          document.getElementById("success-view").hidden = false;
+        });
+      };
+
+      document.getElementById("btn-local").onclick = function () {
+        if (!EpitaphData.isPaid(data)) {
+          data.isPublic = false;
+          data.paid = false;
+          EpitaphApp.save(data);
+          EpitaphData.saveStele(data);
+        }
+        window.location.href = safeReturn();
+      };
+
+      document.getElementById("btn-cancel").onclick = function () {
+        window.location.href = safeReturn();
+      };
+
+      document.getElementById("btn-back-preview").onclick = function () {
+        window.location.href = "preview.html";
+      };
+    })();
+  </script>
+</body>
+</html>

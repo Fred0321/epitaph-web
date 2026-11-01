@@ -40,7 +40,7 @@
     <label class="public-row">
       <span class="public-copy">
         <span class="public-title">公开</span>
-        <span class="public-help">默认关闭。保存后，只有打开公开的碑会出现在本机搜索里。</span>
+        <span class="public-help" id="public-help">默认关闭。要公开到搜索里，需先完成一次 ¥3 模拟支付。不会真扣钱。</span>
       </span>
       <span class="switch">
         <input type="checkbox" id="is-public" />
@@ -112,26 +112,55 @@
         EpitaphApp.copyText(url);
       };
 
-      var pubEl = document.getElementById("is-public");
-      pubEl.checked = data.isPublic === true;
-      pubEl.addEventListener("change", function () {
-        data.isPublic = pubEl.checked;
+      if (EpitaphData.isPaid(data)) data.paid = true;
+      if (data.isPublic === true && !data.paid) {
+        data.isPublic = false;
         EpitaphApp.save(data);
-        if (EpitaphData.hasSaved(data.shareId)) {
+        if (EpitaphData.hasSaved(data.shareId)) EpitaphData.saveStele(data);
+      }
+
+      var pubEl = document.getElementById("is-public");
+      var helpEl = document.getElementById("public-help");
+      pubEl.checked = data.isPublic === true && data.paid === true;
+      if (data.paid) {
+        helpEl.textContent = "已完成模拟支付。打开后，这座碑会出现在搜索里。";
+      }
+
+      pubEl.addEventListener("click", function (event) {
+        if (!pubEl.checked && !EpitaphData.isPaid(data)) {
+          event.preventDefault();
+          window.location.href = "pay.html?from=preview.html";
+        }
+      });
+
+      pubEl.addEventListener("change", function () {
+        if (pubEl.checked && !EpitaphData.isPaid(data)) {
+          pubEl.checked = false;
+          data.isPublic = false;
+          window.location.href = "pay.html?from=preview.html";
+          return;
+        }
+        data.isPublic = pubEl.checked && EpitaphData.isPaid(data);
+        EpitaphApp.save(data);
+        if (EpitaphData.hasSaved(data.shareId) || data.paid) {
           EpitaphData.saveStele(data);
           EpitaphApp.toast(data.isPublic ? "已设为公开" : "已改为不公开");
         }
       });
 
       document.getElementById("btn-save").onclick = function () {
-        data.isPublic = pubEl.checked;
+        if (!EpitaphData.isPaid(data)) {
+          window.location.href = "pay.html?from=preview.html";
+          return;
+        }
+        data.isPublic = pubEl.checked && data.paid === true;
         var okDraft = EpitaphApp.save(data);
         var okList = EpitaphData.saveStele(data);
         if (!okDraft || !okList) {
           EpitaphApp.toast("保存失败，请稍后再试");
           return;
         }
-        EpitaphApp.toast(data.isPublic ? "已保存，本机搜索可以找到" : "已保存到本机，尚未公开");
+        EpitaphApp.toast(data.isPublic ? "已保存，搜索里可以找到" : "已保存。公开仍是关闭的");
       };
 
       EpitaphApp.mountTabbar("mine", false);

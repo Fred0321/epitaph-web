@@ -1140,3 +1140,148 @@ body.has-tabbar .footer-bar {
 body.has-tabbar .toast { bottom: 6.2rem; }
 
 body.has-actionbar .toast { bottom: 13.5rem; }
+
+/* 模拟支付 */
+.app-pay { padding-top: 0.75rem; }
+
+.app-pay .search-hero {
+  min-height: 2.6rem;
+  margin: 0 0 0.45rem;
+}
+
+.app-pay .search-pine {
+  width: 46px;
+  height: 46px;
+}
+
+.demo-banner {
+  margin: 0 0 0.4rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 12px;
+  background: var(--pine);
+  color: #f7f4ea;
+  text-align: center;
+  font-size: 1.12rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.4;
+}
+
+.pay-card {
+  background: #fff;
+  border: 1.5px solid var(--line);
+  border-radius: 16px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.5rem;
+  box-shadow: var(--shadow);
+}
+
+.pay-card-name {
+  margin: 0 0 0.35rem;
+  font-family: var(--serif);
+  font-size: 1.45rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.pay-card-line {
+  margin: 0;
+  font-size: 1.08rem;
+  line-height: 1.6;
+}
+
+.pay-price {
+  margin: 0 0 0.2rem;
+  font-family: var(--serif);
+  font-size: 1.55rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.pay-buys {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+  line-height: 1.55;
+  color: var(--ink);
+}
+
+.pay-benefits {
+  list-style: none;
+  margin: 0 0 0.45rem;
+  padding: 0;
+}
+
+.pay-benefits li {
+  position: relative;
+  margin: 0 0 0.2rem;
+  padding-left: 1.6rem;
+  font-size: 1.02rem;
+  line-height: 1.45;
+}
+
+.pay-benefits li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: var(--pine);
+  font-weight: 700;
+}
+
+.pay-methods { margin-bottom: 0.4rem; }
+
+.pay-method {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 56px;
+  margin-bottom: 0.5rem;
+  padding: 0.65rem 1rem;
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 1.15rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pay-method.selected { border-color: var(--pine); }
+
+.pay-mark {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid #c9c3b4;
+  box-sizing: border-box;
+}
+
+.pay-method.selected .pay-mark {
+  border-color: var(--pine);
+  background: var(--pine);
+}
+
+.pay-method.selected .pay-mark::after {
+  content: "";
+  display: block;
+  width: 7px;
+  height: 12px;
+  margin: 4px auto 0;
+  border: solid #fff;
+  border-width: 0 2.5px 2.5px 0;
+  transform: rotate(45deg);
+}
+
+.app-pay .btn { margin-bottom: 0.55rem; }
+
+.pay-note {
+  margin: 0.15rem 0 0;
+  text-align: center;
+  color: var(--ink-faint);
+  font-size: 0.98rem;
+  line-height: 1.6;
+}
+
+#pay-view[hidden],
+#success-view[hidden] { display: none !important; }
